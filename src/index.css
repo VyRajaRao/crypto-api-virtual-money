@@ -1,0 +1,1100 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Accessibility Utilities */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Focus indicators with high contrast */
+.focus\:ring-accessible {
+  @apply focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2;
+}
+
+.focus\:ring-accessible-light {
+  @apply focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-white;
+}
+
+.focus\:ring-accessible-dark {
+  @apply focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-gray-900;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .text-gray-600 {
+    @apply text-gray-900;
+  }
+  
+  .text-gray-400 {
+    @apply text-gray-700;
+  }
+  
+  .border-gray-200 {
+    @apply border-gray-900;
+  }
+  
+  .bg-gray-50 {
+    @apply bg-white;
+  }
+  
+  .bg-gray-100 {
+    @apply bg-gray-200;
+  }
+}
+
+/* Reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  
+  .animate-spin {
+    animation: none;
+  }
+  
+  .animate-pulse {
+    animation: none;
+  }
+}
+
+/* Enhanced button styles with better touch targets */
+.btn-accessible {
+  @apply px-4 py-2 min-h-[44px] min-w-[44px] font-medium rounded-lg transition-colors duration-200;
+  @apply focus:outline-none focus:ring-2 focus:ring-offset-2;
+}
+
+.btn-primary {
+  @apply btn-accessible bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500;
+}
+
+.btn-secondary {
+  @apply btn-accessible bg-gray-200 text-gray-900 hover:bg-gray-300 focus:ring-gray-500;
+}
+
+.btn-danger {
+  @apply btn-accessible bg-red-600 text-white hover:bg-red-700 focus:ring-red-500;
+}
+
+/* Enhanced form controls */
+.input-accessible {
+  @apply px-3 py-2 min-h-[44px] border border-gray-300 rounded-lg;
+  @apply focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500;
+  @apply disabled:bg-gray-100 disabled:cursor-not-allowed;
+}
+
+/* Skip links for keyboard navigation */
+.skip-link {
+  @apply absolute left-0 top-0 bg-blue-600 text-white px-4 py-2 rounded-br-lg;
+  @apply transform -translate-y-full focus:translate-y-0 transition-transform;
+  @apply z-50 font-medium;
+}
+
+/* Loading states with proper contrast */
+.loading-skeleton {
+  @apply animate-pulse bg-gray-200 rounded;
+}
+
+@media (prefers-color-scheme: dark) {
+  .loading-skeleton {
+    @apply bg-gray-700;
+  }
+}
+
+/* Enhanced table accessibility */
+.table-accessible {
+  @apply w-full border-collapse;
+}
+
+.table-accessible th {
+  @apply px-4 py-3 text-left font-semibold bg-gray-50 border-b border-gray-200;
+  @apply focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500;
+}
+
+.table-accessible td {
+  @apply px-4 py-3 border-b border-gray-100;
+}
+
+.table-accessible tbody tr:hover {
+  @apply bg-gray-50;
+}
+
+@media (prefers-color-scheme: dark) {
+  .table-accessible th {
+    @apply bg-gray-800 border-gray-700;
+  }
+  
+  .table-accessible td {
+    @apply border-gray-700;
+  }
+  
+  .table-accessible tbody tr:hover {
+    @apply bg-gray-800;
+  }
+}
+
+/* Mobile-first responsive improvements and touch enhancements */
+
+/* Mobile viewport fix */
+@viewport {
+  width: device-width;
+  zoom: 1.0;
+}
+
+/* Touch action optimization */
+* {
+  touch-action: manipulation;
+}
+
+/* Smooth scrolling for mobile */
+@supports (scroll-behavior: smooth) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+/* Safe area handling for mobile devices */
+.safe-area-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.safe-area-left {
+  padding-left: env(safe-area-inset-left);
+}
+
+.safe-area-right {
+  padding-right: env(safe-area-inset-right);
+}
+
+/* Mobile scrollbar styling */
+.scrollbar-mobile {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--primary)) transparent;
+}
+
+.scrollbar-mobile::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+.scrollbar-mobile::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-mobile::-webkit-scrollbar-thumb {
+  background-color: hsl(var(--primary));
+  border-radius: 2px;
+}
+
+/* Touch-friendly tap highlights */
+.tap-highlight {
+  -webkit-tap-highlight-color: hsl(var(--primary) / 0.2);
+}
+
+/* Mobile-optimized text selection */
+::selection {
+  background-color: hsl(var(--primary) / 0.3);
+  color: hsl(var(--foreground));
+}
+
+/* Responsive spacing utilities */
+.space-mobile-xs > * + * {
+  margin-top: 0.25rem;
+}
+
+.space-mobile-sm > * + * {
+  margin-top: 0.5rem;
+}
+
+.space-mobile > * + * {
+  margin-top: 0.75rem;
+}
+
+.space-mobile-lg > * + * {
+  margin-top: 1rem;
+}
+
+@media (max-width: 640px) {
+  .container {
+    @apply px-4;
+  }
+  
+  .text-responsive-sm {
+    @apply text-sm;
+  }
+  
+  .text-responsive-base {
+    @apply text-base;
+  }
+  
+  .text-responsive-lg {
+    @apply text-lg;
+  }
+  
+  .text-responsive-xl {
+    @apply text-xl;
+  }
+  
+  .text-responsive-2xl {
+    @apply text-2xl;
+  }
+  
+  /* Stack form elements on mobile */
+  .form-stack {
+    @apply flex flex-col space-y-2;
+  }
+  
+  /* Full width buttons on mobile */
+  .btn-mobile-full {
+    @apply w-full;
+  }
+}
+
+@media (min-width: 641px) {
+  .text-responsive-sm {
+    @apply text-base;
+  }
+  
+  .text-responsive-base {
+    @apply text-lg;
+  }
+  
+  .text-responsive-lg {
+    @apply text-xl;
+  }
+  
+  .text-responsive-xl {
+    @apply text-2xl;
+  }
+  
+  .text-responsive-2xl {
+    @apply text-3xl;
+  }
+  
+  .form-stack {
+    @apply flex flex-row space-x-4 space-y-0;
+  }
+}
+
+/* Chart container responsive sizing */
+.chart-container {
+  position: relative;
+  height: 200px;
+  width: 100%;
+}
+
+@media (min-width: 768px) {
+  .chart-container {
+    height: 300px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .chart-container {
+    height: 400px;
+  }
+}
+
+/* Print styles */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  
+  .print-friendly {
+    @apply text-black bg-white;
+  }
+  
+  .chart-container {
+    height: 300px;
+    break-inside: avoid;
+  }
+}
+
+/* Dark mode improvements */
+@media (prefers-color-scheme: dark) {
+  .btn-primary {
+    @apply bg-blue-500 hover:bg-blue-600;
+  }
+  
+  .btn-secondary {
+    @apply bg-gray-700 text-gray-100 hover:bg-gray-600;
+  }
+  
+  .input-accessible {
+    @apply bg-gray-800 border-gray-600 text-white;
+    @apply focus:ring-blue-400 focus:border-blue-400;
+  }
+}
+
+/* Utility classes for better spacing and typography */
+.prose-accessible {
+  @apply leading-relaxed;
+}
+
+.prose-accessible h1 {
+  @apply text-3xl font-bold mb-4 mt-6;
+}
+
+.prose-accessible h2 {
+  @apply text-2xl font-semibold mb-3 mt-5;
+}
+
+.prose-accessible h3 {
+  @apply text-xl font-medium mb-2 mt-4;
+}
+
+.prose-accessible p {
+  @apply mb-4;
+}
+
+.prose-accessible ul,
+.prose-accessible ol {
+  @apply mb-4 ml-6;
+}
+
+.prose-accessible li {
+  @apply mb-1;
+}
+
+/* Futuristic Crypto Dashboard Design System - Dark theme with RGB neon accents */
+
+@layer base {
+  :root {
+    /* Dark Theme Base */
+    --background: 220 27% 6%;
+    --foreground: 210 40% 98%;
+
+    --card: 224 26% 8%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 224 26% 8%;
+    --popover-foreground: 210 40% 98%;
+
+    /* Neon Cyan Primary */
+    --primary: 190 95% 60%;
+    --primary-foreground: 224 26% 8%;
+
+    /* Dark Secondary */
+    --secondary: 225 25% 12%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 225 25% 12%;
+    --muted-foreground: 215 20.2% 65%;
+
+    /* Neon Purple Accent */
+    --accent: 280 100% 70%;
+    --accent-foreground: 224 26% 8%;
+
+    /* Neon Red for losses */
+    --destructive: 0 100% 67%;
+    --destructive-foreground: 210 40% 98%;
+
+    /* Success Green for gains */
+    --success: 120 100% 50%;
+    --success-foreground: 224 26% 8%;
+
+    /* Subtle borders and inputs */
+    --border: 225 25% 15%;
+    --input: 225 25% 15%;
+    --ring: 190 95% 60%;
+
+    --radius: 0.75rem;
+
+    /* Sidebar Dark */
+    --sidebar-background: 222 27% 4%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 190 95% 60%;
+    --sidebar-primary-foreground: 224 26% 8%;
+    --sidebar-accent: 225 25% 12%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 225 25% 15%;
+    --sidebar-ring: 190 95% 60%;
+
+    /* Custom Crypto Colors */
+    --crypto-gain: 120 100% 50%;
+    --crypto-loss: 0 100% 67%;
+    --crypto-neutral: 215 20.2% 65%;
+    --neon-pink: 320 100% 70%;
+    --neon-blue: 210 100% 70%;
+    --neon-glow: 0 0% 100%;
+
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(190, 95%, 60%), hsl(280, 100%, 70%));
+    --gradient-secondary: linear-gradient(135deg, hsl(225, 25%, 12%), hsl(224, 26%, 8%));
+    --gradient-glow: linear-gradient(135deg, hsl(190, 95%, 60%, 0.1), hsl(280, 100%, 70%, 0.1));
+    --gradient-card: linear-gradient(135deg, hsl(224, 26%, 8%) 0%, hsl(225, 25%, 12%) 100%);
+
+    /* Shadows with glow effects */
+    --shadow-neon: 0 0 20px hsl(190, 95%, 60%, 0.3);
+    --shadow-card: 0 4px 6px -1px hsl(220, 27%, 6%, 0.1), 0 2px 4px -1px hsl(220, 27%, 6%, 0.06);
+    --shadow-glow: 0 0 40px hsl(190, 95%, 60%, 0.2);
+
+    /* Animations */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-fast: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Force dark theme */
+  .dark {
+    --background: 220 27% 6%;
+    --foreground: 210 40% 98%;
+    --card: 224 26% 8%;
+    --card-foreground: 210 40% 98%;
+    --popover: 224 26% 8%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 190 95% 60%;
+    --primary-foreground: 224 26% 8%;
+    --secondary: 225 25% 12%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 225 25% 12%;
+    --muted-foreground: 215 20.2% 65%;
+    --accent: 280 100% 70%;
+    --accent-foreground: 224 26% 8%;
+    --destructive: 0 100% 67%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 225 25% 15%;
+    --input: 225 25% 15%;
+    --ring: 190 95% 60%;
+    --sidebar-background: 222 27% 4%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 190 95% 60%;
+    --sidebar-primary-foreground: 224 26% 8%;
+    --sidebar-accent: 225 25% 12%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 225 25% 15%;
+    --sidebar-ring: 190 95% 60%;
+  }
+}
+
+/* Mobile-specific enhancements */
+@media (max-width: 768px) {
+  /* Optimize font sizes for mobile readability */
+  html {
+    font-size: 16px; /* Ensures 1rem = 16px for better mobile accessibility */
+  }
+  
+  /* Larger touch targets for mobile */
+  button, 
+  input, 
+  select, 
+  textarea, 
+  a {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Mobile-optimized table styles */
+  .mobile-table {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+  
+  .mobile-table thead {
+    display: none;
+  }
+  
+  .mobile-table tbody,
+  .mobile-table tr,
+  .mobile-table td {
+    display: block;
+    width: 100%;
+  }
+  
+  .mobile-table tr {
+    border: 1px solid hsl(var(--border));
+    margin-bottom: 0.5rem;
+    padding: 0.5rem;
+    border-radius: 0.5rem;
+  }
+  
+  /* Mobile-optimized form layouts */
+  .mobile-form {
+    width: 100%;
+  }
+  
+  .mobile-form input,
+  .mobile-form select,
+  .mobile-form textarea {
+    width: 100%;
+    margin-bottom: 1rem;
+  }
+  
+  .mobile-form .form-row {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+}
+
+/* Landscape mobile optimizations */
+@media (max-height: 500px) and (orientation: landscape) {
+  /* Reduce header height in landscape */
+  .mobile-header {
+    height: 3rem;
+  }
+  
+  /* Compact spacing in landscape */
+  .landscape-compact {
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+  }
+}
+
+/* High DPI display optimizations */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  /* Ensure crisp borders and text on high DPI screens */
+  * {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
+  /* Adjust border widths for high DPI */
+  .high-dpi-border {
+    border-width: 0.5px;
+  }
+}
+
+/* Performance optimizations for mobile */
+.gpu-accelerated {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
+/* Mobile-friendly animations */
+@media (prefers-reduced-motion: no-preference) {
+  .mobile-slide {
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .mobile-fade {
+    transition: opacity 0.2s ease-in-out;
+  }
+  
+  .mobile-bounce {
+    animation: mobile-bounce 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  }
+}
+
+@keyframes mobile-bounce {
+  0% { transform: scale(0.95); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+/* Dark mode mobile optimizations */
+@media (prefers-color-scheme: dark) {
+  /* Ensure sufficient contrast for mobile screens */
+  .mobile-text {
+    color: hsl(var(--foreground));
+  }
+  
+  .mobile-bg {
+    background-color: hsl(var(--background));
+  }
+  
+  /* Optimize for OLED displays */
+  .oled-black {
+    background-color: #000000;
+  }
+}
+
+/* iOS Safari specific fixes */
+@supports (-webkit-touch-callout: none) {
+  /* Fix iOS zoom on input focus */
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  textarea {
+    font-size: 16px !important;
+  }
+  
+  /* Fix iOS rubber band scrolling */
+  .ios-scroll-fix {
+    -webkit-overflow-scrolling: touch;
+    overflow: scroll;
+  }
+  
+  /* Fix iOS button styling */
+  button {
+    -webkit-appearance: none;
+    appearance: none;
+  }
+}
+
+/* Android Chrome specific fixes */
+@media screen and (-webkit-min-device-pixel-ratio: 0) and (min-resolution: .001dpcm) {
+  /* Fix Android Chrome scrollbar */
+  .android-scrollbar {
+    scrollbar-width: thin;
+  }
+  
+  /* Fix Android Chrome zoom */
+  .android-no-zoom {
+    touch-action: pan-x pan-y;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@layer components {
+  /* Neon glow effects */
+  .glow-primary {
+    box-shadow: 0 0 20px hsl(var(--primary) / 0.3);
+  }
+
+  .glow-accent {
+    box-shadow: 0 0 20px hsl(var(--accent) / 0.3);
+  }
+
+  .glow-success {
+    box-shadow: 0 0 20px hsl(var(--success) / 0.3);
+  }
+
+  .glow-destructive {
+    box-shadow: 0 0 20px hsl(var(--destructive) / 0.3);
+  }
+
+  /* Gradient backgrounds */
+  .bg-gradient-primary {
+    background: var(--gradient-primary);
+  }
+
+  .bg-gradient-secondary {
+    background: var(--gradient-secondary);
+  }
+
+  .bg-gradient-glow {
+    background: var(--gradient-glow);
+  }
+
+  .bg-gradient-card {
+    background: var(--gradient-card);
+  }
+
+  /* Crypto specific colors */
+  .text-crypto-gain {
+    color: hsl(var(--crypto-gain));
+  }
+
+  .text-crypto-loss {
+    color: hsl(var(--crypto-loss));
+  }
+
+  .text-crypto-neutral {
+    color: hsl(var(--crypto-neutral));
+  }
+
+  /* Smooth transitions */
+  .transition-smooth {
+    transition: var(--transition-smooth);
+  }
+
+  .transition-fast {
+    transition: var(--transition-fast);
+  }
+
+  /* Neon border effect */
+  .border-neon {
+    border: 1px solid hsl(var(--primary) / 0.3);
+    box-shadow: 0 0 10px hsl(var(--primary) / 0.1);
+  }
+
+  .border-neon:hover {
+    border-color: hsl(var(--primary) / 0.6);
+    box-shadow: 0 0 20px hsl(var(--primary) / 0.2);
+  }
+
+  /* Scrollbar styling */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--primary) / 0.3) hsl(var(--background));
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: hsl(var(--background));
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: hsl(var(--primary) / 0.3);
+    border-radius: 2px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--primary) / 0.5);
+  }
+
+  /* Additional shadow utilities */
+  .shadow-neon {
+    box-shadow: var(--shadow-neon);
+  }
+
+  .shadow-glow {
+    box-shadow: var(--shadow-glow);
+  }
+
+  .shadow-card {
+    box-shadow: var(--shadow-card);
+  }
+
+  /* Hover glow effects */
+  .hover\:shadow-glow:hover {
+    box-shadow: var(--shadow-glow);
+  }
+
+  .hover\:glow-primary:hover {
+    box-shadow: 0 0 30px hsl(var(--primary) / 0.4);
+  }
+
+  /* Pulse animation for live indicators */
+  .animate-glow-pulse {
+    animation: glow-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  @keyframes glow-pulse {
+    0%, 100% {
+      opacity: 1;
+      box-shadow: 0 0 10px hsl(var(--crypto-gain) / 0.5);
+    }
+    50% {
+      opacity: 0.8;
+      box-shadow: 0 0 20px hsl(var(--crypto-gain) / 0.8), 0 0 30px hsl(var(--crypto-gain) / 0.3);
+    }
+  }
+
+  /* Card hover effects */
+  .card-hover {
+    @apply transition-all duration-300 hover:scale-[1.02] hover:shadow-glow;
+  }
+
+  /* Button glow effects */
+  .btn-glow {
+    @apply bg-gradient-primary text-primary-foreground shadow-neon transition-all duration-300;
+  }
+
+  .btn-glow:hover {
+    @apply shadow-glow scale-105;
+  }
+
+  /* Backdrop blur effects */
+  .backdrop-glow {
+    backdrop-filter: blur(8px);
+    background: hsl(var(--background) / 0.8);
+  }
+
+  /* Loading shimmer effect */
+  .animate-shimmer {
+    background: linear-gradient(90deg, hsl(var(--muted)) 25%, hsl(var(--primary) / 0.1) 50%, hsl(var(--muted)) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+
+  @keyframes shimmer {
+    0% {
+      background-position: -200% 0;
+    }
+    100% {
+      background-position: 200% 0;
+    }
+  }
+
+  /* Floating animation for cards */
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+
+  @keyframes float {
+    0%, 100% {
+      transform: translateY(0px);
+    }
+    50% {
+      transform: translateY(-10px);
+    }
+  }
+
+  /* Neon text effect */
+  .text-neon {
+    color: hsl(var(--primary));
+    text-shadow: 0 0 10px hsl(var(--primary) / 0.5);
+  }
+
+  /* Data visualization colors */
+  .text-chart-1 { color: hsl(var(--primary)); }
+  .text-chart-2 { color: hsl(var(--accent)); }
+  .text-chart-3 { color: hsl(var(--crypto-gain)); }
+  .text-chart-4 { color: hsl(var(--crypto-loss)); }
+  .text-chart-5 { color: hsl(var(--neon-pink)); }
+  .text-chart-6 { color: hsl(var(--neon-blue)); }
+
+  .fill-chart-1 { fill: hsl(var(--primary)); }
+  .fill-chart-2 { fill: hsl(var(--accent)); }
+  .fill-chart-3 { fill: hsl(var(--crypto-gain)); }
+  .fill-chart-4 { fill: hsl(var(--crypto-loss)); }
+  .fill-chart-5 { fill: hsl(var(--neon-pink)); }
+  .fill-chart-6 { fill: hsl(var(--neon-blue)); }
+
+  /* Enhanced mobile spacing utilities */
+  .touch-target {
+    @apply min-h-[44px] min-w-[44px] touch-manipulation;
+  }
+
+  /* Mobile-safe containers */
+  .container-mobile {
+    @apply px-4 sm:px-6 max-w-full;
+  }
+
+  /* Enhanced card mobile padding */
+  .card-mobile-padded {
+    @apply p-4 sm:p-6;
+  }
+
+  .card-mobile-header {
+    @apply px-4 sm:px-6 py-3 sm:py-4;
+  }
+
+  .card-mobile-content {
+    @apply px-4 sm:px-6 pb-4 sm:pb-6;
+  }
+
+  /* Mobile-friendly text spacing */
+  .text-mobile-readable {
+    @apply leading-relaxed px-2;
+  }
+
+  /* Error state mobile styling */
+  .error-state-mobile {
+    @apply flex flex-col items-center justify-center px-6 py-8 text-center min-h-[300px];
+  }
+
+  .error-icon-mobile {
+    @apply w-16 h-16 mb-4;
+  }
+
+  .error-title-mobile {
+    @apply text-lg font-semibold mb-2;
+  }
+
+  .error-message-mobile {
+    @apply text-sm text-muted-foreground mb-6 max-w-sm leading-relaxed;
+  }
+
+  .retry-button-mobile {
+    @apply touch-target px-6 py-3;
+  }
+
+  /* Mobile scrollable table wrapper */
+  .table-wrapper-mobile {
+    @apply overflow-x-auto -mx-4 sm:-mx-6;
+  }
+
+  .table-wrapper-mobile table {
+    @apply min-w-[600px];
+  }
+
+  /* Mobile grid improvements */
+  .mobile-grid-safe {
+    @apply grid gap-3 sm:gap-4 px-4 sm:px-0;
+  }
+}
+
+/* Portrait/landscape specific utilities */
+@media (orientation: portrait) {
+  .portrait\:px-4 { @apply px-4; }
+  .portrait\:py-2 { @apply py-2; }
+  .portrait\:space-y-4 > * + * { @apply mt-4; }
+}
+
+@media (orientation: landscape) and (max-height: 500px) {
+  .landscape\:py-1 { @apply py-1; }
+  .landscape\:space-y-2 > * + * { @apply mt-2; }
+  .landscape\:text-sm { @apply text-sm; }
+}
+
+/* High contrast mobile */
+@media (prefers-contrast: high) {
+  .mobile-text-readable {
+    color: hsl(var(--foreground));
+  }
+  
+  .mobile-border {
+    border-color: hsl(var(--foreground));
+  }
+}
+
+/* Unified Responsive Font System */
+
+/* Base mobile typography */
+.responsive-title {
+  @apply text-2xl sm:text-3xl lg:text-4xl font-bold;
+}
+
+.responsive-heading {
+  @apply text-lg sm:text-xl lg:text-2xl font-semibold;
+}
+
+.responsive-subheading {
+  @apply text-base sm:text-lg lg:text-xl font-medium;
+}
+
+.responsive-body {
+  @apply text-sm sm:text-base lg:text-lg;
+}
+
+.responsive-small {
+  @apply text-xs sm:text-sm lg:text-base;
+}
+
+.responsive-caption {
+  @apply text-xs sm:text-xs lg:text-sm;
+}
+
+/* Portrait mobile orientation */
+@media screen and (max-width: 768px) and (orientation: portrait) {
+  .responsive-title {
+    @apply text-xl font-bold leading-tight;
+  }
+  
+  .responsive-heading {
+    @apply text-lg font-semibold leading-tight;
+  }
+  
+  .responsive-subheading {
+    @apply text-base font-medium leading-snug;
+  }
+  
+  .responsive-body {
+    @apply text-sm leading-relaxed;
+  }
+  
+  .responsive-small {
+    @apply text-xs leading-normal;
+  }
+  
+  .responsive-caption {
+    @apply text-xs leading-tight;
+  }
+  
+  .portrait-spacing {
+    @apply space-y-3;
+  }
+  
+  .portrait-padding {
+    @apply p-4;
+  }
+}
+
+/* Landscape mobile orientation - more compact */
+@media screen and (max-width: 768px) and (orientation: landscape) {
+  .responsive-title {
+    @apply text-lg font-bold leading-tight;
+  }
+  
+  .responsive-heading {
+    @apply text-base font-semibold leading-tight;
+  }
+  
+  .responsive-subheading {
+    @apply text-sm font-medium leading-snug;
+  }
+  
+  .responsive-body {
+    @apply text-xs leading-snug;
+  }
+  
+  .responsive-small {
+    @apply text-xs leading-tight;
+  }
+  
+  .responsive-caption {
+    @apply text-xs leading-tight;
+  }
+  
+  .landscape-spacing {
+    @apply space-y-1;
+  }
+  
+  .landscape-card {
+    @apply p-2 m-1;
+  }
+  
+  .landscape-button {
+    @apply min-h-[36px] px-3 py-1 text-xs;
+  }
+}
+
+/* Enhanced mobile classes */
+@media screen and (max-width: 768px) {
+  .mobile-card {
+    @apply rounded-lg;
+  }
+  
+  .mobile-button {
+    @apply min-h-[44px] px-4 py-2;
+  }
+  
+  /* Card content responsive sizing */
+  .card-title-responsive {
+    @apply responsive-heading;
+  }
+  
+  .card-description-responsive {
+    @apply responsive-small text-muted-foreground;
+  }
+  
+  .button-text-responsive {
+    @apply responsive-small;
+  }
+}
+
+/* Ensure proper viewport handling */
+@media screen and (max-width: 768px) {
+  .mobile-viewport {
+    width: 100vw;
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+  
+  .mobile-full {
+    @apply w-full min-w-0;
+  }
+  
+  .mobile-scroll {
+    @apply overflow-x-auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
