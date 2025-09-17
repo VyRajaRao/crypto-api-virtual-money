@@ -10,6 +10,7 @@ import {
   Search,
   Activity,
   Zap,
+  User,
 } from "lucide-react";
 
 import {
@@ -29,6 +30,7 @@ const navigationItems = [
   { title: "Trends", url: "/trends", icon: TrendingUp },
   { title: "Analysis", url: "/analysis", icon: BarChart3 },
   { title: "Portfolio", url: "/portfolio", icon: Wallet },
+  { title: "Account", url: "/account", icon: User },
   { title: "Settings", url: "/settings", icon: Settings },
 ];
 

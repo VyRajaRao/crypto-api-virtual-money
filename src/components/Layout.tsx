@@ -6,7 +6,7 @@ import { Bell, User, LogOut, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/hooks/useAuth";
-import { Navigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import { ARIA_LABELS, prefersReducedMotion } from "../utils/accessibility";
 import { useState, useEffect } from 'react';
 import { useAlerts } from '@/hooks/useSupabase';
@@ -16,8 +16,9 @@ interface LayoutProps {
 }
 
 export function Layout({ children }: LayoutProps) {
-  const { user, loading, signOut } = useAuth();
+  const { user, loading, signOut, isDemo } = useAuth();
   const { alerts } = useAlerts();
+  const navigate = useNavigate();
   const [reducedMotion, setReducedMotion] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   
@@ -146,7 +147,17 @@ export function Layout({ children }: LayoutProps) {
                       role="menuitem"
                     >
                       <div className="font-medium">{user.email}</div>
-                      <div className="text-xs text-muted-foreground">Signed in as</div>
+                      <div className="text-xs text-muted-foreground">
+                        Signed in as {isDemo && '(Demo Mode)'}
+                      </div>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={() => navigate('/account')} 
+                      className="focus:ring-accessible"
+                      role="menuitem"
+                    >
+                      <User className="w-4 h-4 mr-2" aria-hidden="true" />
+                      Account Settings
                     </DropdownMenuItem>
                     <DropdownMenuItem 
                       onClick={handleSignOut} 

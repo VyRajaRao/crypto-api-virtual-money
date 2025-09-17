@@ -34,6 +34,8 @@ const EnhancedPriceAlerts = lazy(() => import("@/pages/EnhancedPriceAlerts"));
 const EnhancedLiveTrading = lazy(() => import("@/pages/EnhancedLiveTrading"));
 const CoinDetail = lazy(() => import("@/pages/CoinDetail"));
 const Leaderboard = lazy(() => import("@/pages/Leaderboard"));
+const Account = lazy(() => import("@/pages/Account"));
+const EmailVerification = lazy(() => import("@/pages/EmailVerification"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -177,6 +179,7 @@ function App() {
                 <Routes>
                   <Route path="/" element={<Index />} />
                   <Route path="/auth" element={<Auth />} />
+                  <Route path="/auth/verify" element={<EmailVerification />} />
                   <Route
                     path="/*"
                     element={
@@ -194,6 +197,7 @@ function App() {
                             <Route path="/alerts" element={<ConnectedPriceAlerts />} />
                             <Route path="/trading" element={<ConnectedLiveTrading />} />
                             <Route path="/leaderboard" element={<Leaderboard />} />
+                            <Route path="/account" element={<Account />} />
                             <Route path="/coins/:id" element={<CoinDetail />} />
                             <Route path="*" element={<NotFound />} />
                           </Routes>
