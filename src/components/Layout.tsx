@@ -16,7 +16,7 @@ interface LayoutProps {
 }
 
 export function Layout({ children }: LayoutProps) {
-  const { user, loading, signOut, isDemo } = useAuth();
+  const { user, loading, signOut } = useAuth();
   const { alerts } = useAlerts();
   const navigate = useNavigate();
   const [reducedMotion, setReducedMotion] = useState(false);
@@ -148,7 +148,7 @@ export function Layout({ children }: LayoutProps) {
                     >
                       <div className="font-medium">{user.email}</div>
                       <div className="text-xs text-muted-foreground">
-                        Signed in as {isDemo && '(Demo Mode)'}
+                        Signed in
                       </div>
                     </DropdownMenuItem>
                     <DropdownMenuItem 

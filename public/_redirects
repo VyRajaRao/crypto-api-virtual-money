@@ -1,0 +1,3 @@
+# Handle client-side routing for Single Page Application
+# Redirect all routes to index.html (except static assets)
+/*    /index.html   200

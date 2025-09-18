@@ -35,7 +35,6 @@ const EnhancedLiveTrading = lazy(() => import("@/pages/EnhancedLiveTrading"));
 const CoinDetail = lazy(() => import("@/pages/CoinDetail"));
 const Leaderboard = lazy(() => import("@/pages/Leaderboard"));
 const Account = lazy(() => import("@/pages/Account"));
-const EmailVerification = lazy(() => import("@/pages/EmailVerification"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -179,7 +178,6 @@ function App() {
                 <Routes>
                   <Route path="/" element={<Index />} />
                   <Route path="/auth" element={<Auth />} />
-                  <Route path="/auth/verify" element={<EmailVerification />} />
                   <Route
                     path="/*"
                     element={
