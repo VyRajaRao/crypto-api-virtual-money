@@ -186,14 +186,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const resendVerificationEmail = async (email: string): Promise<{ success: boolean; error?: string }> => {
-    // Email verification not needed - always return success
-    toast.info('Email verification is not required for this application.');
+    // Email verification not needed - always return success silently
     return { success: true };
   };
 
   const resetPassword = async (email: string): Promise<{ success: boolean; error?: string }> => {
-    // Password reset not needed - always return success
-    toast.info('Password reset is not required for this application.');
+    // Password reset not needed - always return success silently
     return { success: true };
   };
 
