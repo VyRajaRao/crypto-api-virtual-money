@@ -1,6 +1,8 @@
 import '@testing-library/jest-dom';
+import { jest } from '@jest/globals';
 import { setupServer } from 'msw/node';
-import { rest } from 'msw';
+import * as msw from 'msw';
+const { rest } = msw as any;
 
 // Mock environment variables
 process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://mock-supabase-url.supabase.co';
@@ -8,7 +10,7 @@ process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'mock-supabase-anon-key';
 process.env.NEXT_PUBLIC_COINGECKO_API_KEY = 'mock-coingecko-api-key';
 
 // Mock IntersectionObserver
-global.IntersectionObserver = class IntersectionObserver {
+(global as any).IntersectionObserver = class IntersectionObserver {
   constructor() {}
   observe() { return null; }
   disconnect() { return null; }
@@ -16,7 +18,7 @@ global.IntersectionObserver = class IntersectionObserver {
 };
 
 // Mock ResizeObserver
-global.ResizeObserver = class ResizeObserver {
+(global as any).ResizeObserver = class ResizeObserver {
   constructor() {}
   observe() { return null; }
   disconnect() { return null; }
@@ -26,7 +28,7 @@ global.ResizeObserver = class ResizeObserver {
 // Mock matchMedia
 Object.defineProperty(window, 'matchMedia', {
   writable: true,
-  value: jest.fn().mockImplementation(query => ({
+  value: jest.fn().mockImplementation((query: string) => ({
     matches: false,
     media: query,
     onchange: null,
@@ -39,7 +41,7 @@ Object.defineProperty(window, 'matchMedia', {
 });
 
 // Mock crypto
-Object.defineProperty(global, 'crypto', {
+Object.defineProperty(global as any, 'crypto', {
   value: {
     getRandomValues: jest.fn(() => new Uint8Array(32)),
   },
@@ -140,28 +142,34 @@ beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
 
-// Mock Next.js router
-jest.mock('next/router', () => ({
-  useRouter() {
-    return {
-      route: '/',
-      pathname: '/',
-      query: {},
-      asPath: '/',
-      push: jest.fn(() => Promise.resolve(true)),
-      replace: jest.fn(() => Promise.resolve(true)),
-      reload: jest.fn(() => Promise.resolve(true)),
-      back: jest.fn(() => Promise.resolve(true)),
-      prefetch: jest.fn(() => Promise.resolve()),
-      beforePopState: jest.fn(() => Promise.resolve()),
-      events: {
-        on: jest.fn(),
-        off: jest.fn(),
-        emit: jest.fn(),
-      },
-    };
-  },
-}));
+// Mock Next.js router if available
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  require.resolve('next/router');
+  jest.mock('next/router', () => ({
+    useRouter() {
+      return {
+        route: '/',
+        pathname: '/',
+        query: {},
+        asPath: '/',
+        push: jest.fn(() => Promise.resolve(true)),
+        replace: jest.fn(() => Promise.resolve(true)),
+        reload: jest.fn(() => Promise.resolve(true)),
+        back: jest.fn(() => Promise.resolve(true)),
+        prefetch: jest.fn(() => Promise.resolve()),
+        beforePopState: jest.fn(() => Promise.resolve()),
+        events: {
+          on: jest.fn(),
+          off: jest.fn(),
+          emit: jest.fn(),
+        },
+      };
+    },
+  }));
+} catch (e) {
+  // next/router not installed in this project; skip mocking
+}
 
 // Mock Supabase
 jest.mock('@/lib/supabase', () => ({
@@ -184,7 +192,7 @@ jest.mock('@/lib/supabase', () => ({
       order: jest.fn().mockReturnThis(),
       limit: jest.fn().mockReturnThis(),
       single: jest.fn(() => Promise.resolve({ data: null, error: null })),
-      then: jest.fn((callback) => callback({ data: [], error: null })),
+      then: jest.fn((callback: any) => callback({ data: [], error: null })),
     })),
     storage: {
       from: jest.fn(() => ({
@@ -255,7 +263,7 @@ const localStorageMock = {
   removeItem: jest.fn(),
   clear: jest.fn(),
 };
-global.localStorage = localStorageMock;
+(global as any).localStorage = localStorageMock as any;
 
 // Mock session storage
 const sessionStorageMock = {
@@ -264,7 +272,7 @@ const sessionStorageMock = {
   removeItem: jest.fn(),
   clear: jest.fn(),
 };
-global.sessionStorage = sessionStorageMock;
+(global as any).sessionStorage = sessionStorageMock as any;
 
 // Global test cleanup
 afterEach(() => {

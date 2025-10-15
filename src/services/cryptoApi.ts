@@ -1,14 +1,14 @@
 import axios from 'axios';
 
-const API_KEY = 'CG-HnpEbeYmceViPb2zW9gVZE6s';
+const API_KEY = import.meta.env.VITE_COINGECKO_KEY || '';
 const BASE_URL = 'https://api.coingecko.com/api/v3';
 
 // Create axios instance with default config
 const api = axios.create({
   baseURL: BASE_URL,
-  headers: {
+  headers: API_KEY ? {
     'X-CG-Demo-API-Key': API_KEY,
-  },
+  } : {},
 });
 
 export interface CoinData {

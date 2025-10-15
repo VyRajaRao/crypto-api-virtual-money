@@ -288,6 +288,7 @@ export function showNetworkErrorToast(error: NetworkError) {
 export class NetworkStatusMonitor {
   private listeners: ((online: boolean) => void)[] = [];
   private _isOnline = navigator.onLine;
+  private notifyNetworkToasts = false;
 
   constructor() {
     this.initialize();
@@ -301,18 +302,27 @@ export class NetworkStatusMonitor {
   private handleOnline = () => {
     this._isOnline = true;
     this.notifyListeners(true);
-    toast.success('Connection restored', {
-      description: 'You are back online!'
-    });
+    if (this.notifyNetworkToasts) {
+      toast.success('Connection restored', {
+        description: 'You are back online!'
+      });
+    }
   };
 
   private handleOffline = () => {
     this._isOnline = false;
     this.notifyListeners(false);
-    toast.error('Connection lost', {
-      description: 'Please check your internet connection.'
-    });
+    if (this.notifyNetworkToasts) {
+      toast.error('Connection lost', {
+        description: 'Please check your internet connection.'
+      });
+    }
   };
+
+  // Allow app to enable/disable network toasts (default off to avoid noisy errors on first load)
+  public enableNetworkToasts(enable = true) {
+    this.notifyNetworkToasts = enable;
+  }
 
   private notifyListeners(online: boolean) {
     this.listeners.forEach(listener => listener(online));

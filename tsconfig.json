@@ -9,6 +9,8 @@
     "paths": {
       "@/*": ["./src/*"]
     },
+    "esModuleInterop": true,
+    "types": ["node", "jest"],
     "noImplicitAny": false,
     "noUnusedParameters": false,
     "skipLibCheck": true,

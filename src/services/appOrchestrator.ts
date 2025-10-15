@@ -13,7 +13,7 @@ export class AppOrchestrator {
   /**
    * Initialize the entire application
    */
-  async initialize(): Promise<void> {
+  async initialize(options?: { notifyOnError?: boolean }): Promise<void> {
     if (this.isInitialized) {
       console.log('App already initialized');
       return;
@@ -45,7 +45,10 @@ export class AppOrchestrator {
 
     } catch (error) {
       console.error('❌ Failed to initialize CryptoVault:', error);
-      toast.error('Failed to initialize application');
+      // Only show error toasts when explicitly requested (avoid alarming users on first load)
+      if (options?.notifyOnError) {
+        toast.error('Failed to initialize application');
+      }
     }
   }
 

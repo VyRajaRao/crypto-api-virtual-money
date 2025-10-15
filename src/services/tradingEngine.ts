@@ -60,9 +60,11 @@ export interface Wallet {
   currency: string;
 }
 
+import { D, mul, add, toNumber } from '@/lib/decimal'
+
 class TradingEngine {
-  private readonly TRADING_FEE_RATE = 0.001; // 0.1% trading fee
-  private readonly MIN_ORDER_VALUE = 1; // Minimum $1 order
+  private readonly TRADING_FEE_RATE = D(0.001); // 0.1% trading fee
+  private readonly MIN_ORDER_VALUE = D(1); // Minimum $1 order
 
   /**
    * Execute a market order immediately
@@ -152,6 +154,9 @@ class TradingEngine {
       }
 
       // Place pending limit order
+      const total = mul(request.amount, request.price)
+      const fees = total.times(this.TRADING_FEE_RATE)
+
       const { data: trade, error } = await supabase
         .from('trades')
         .insert({
@@ -160,8 +165,8 @@ class TradingEngine {
           side: request.side,
           amount: request.amount,
           price: request.price,
-          total_usd: request.amount * request.price,
-          fees_usd: (request.amount * request.price) * this.TRADING_FEE_RATE,
+          total_usd: toNumber(total),
+          fees_usd: toNumber(fees),
           status: 'pending',
           order_type: 'limit',
           coin_id: request.symbol, // For compatibility with existing schema
@@ -370,10 +375,10 @@ class TradingEngine {
    */
   private async validateOrder(request: TradeRequest & { price: number }): Promise<{ valid: boolean; error?: string }> {
     try {
-      // Check minimum order value
-      const orderValue = request.amount * request.price;
-      if (orderValue < this.MIN_ORDER_VALUE) {
-        return { valid: false, error: `Minimum order value is $${this.MIN_ORDER_VALUE}` };
+      // Check minimum order value using decimal math
+      const orderValue = mul(request.amount, request.price)
+      if (orderValue.lt(this.MIN_ORDER_VALUE)) {
+        return { valid: false, error: `Minimum order value is $${this.MIN_ORDER_VALUE.toNumber()}` };
       }
 
       // Get user wallet and portfolio
@@ -391,15 +396,15 @@ class TradingEngine {
 
       // Validate buy order
       if (request.side === 'buy') {
-        const totalCost = orderValue + (orderValue * this.TRADING_FEE_RATE);
-        if (totalCost > wallet.available_balance) {
+        const totalCost = add(orderValue, orderValue.times(this.TRADING_FEE_RATE))
+        if (totalCost.gt(D(wallet.available_balance))) {
           return { valid: false, error: 'Insufficient funds' };
         }
       }
 
       // Validate sell order
       if (request.side === 'sell') {
-        if (!position || request.amount > position.amount) {
+        if (!position || D(request.amount).gt(D(position.amount))) {
           return { valid: false, error: 'Insufficient holdings' };
         }
       }

@@ -56,7 +56,8 @@ function AppStoreProvider({ children }: { children: React.ReactNode }) {
 
   // Initialize app orchestrator on mount
   useEffect(() => {
-    appOrchestrator.initialize();
+    // Initialize without showing error toasts by default (avoids alarming users on first load)
+    appOrchestrator.initialize({ notifyOnError: false });
     
     // Setup auth state listener
     const handleAuthChange = (user: any) => {
@@ -165,6 +166,22 @@ function App() {
       window.removeEventListener('beforeunload', saveRecoveryState);
       clearTimeout((window as any).scrollTimeout);
     };
+  }, []);
+
+  // Enable network toasts after app is mounted so online/offline notifications don't appear immediately
+  useEffect(() => {
+    try {
+      // Import lazily to avoid circular deps
+      import('@/utils/networkErrorHandler').then((mod) => {
+        if (mod && mod.networkMonitor && typeof mod.networkMonitor.enableNetworkToasts === 'function') {
+          mod.networkMonitor.enableNetworkToasts(true);
+        }
+      }).catch(() => {
+        // ignore
+      });
+    } catch (e) {
+      // ignore
+    }
   }, []);
   
   return (

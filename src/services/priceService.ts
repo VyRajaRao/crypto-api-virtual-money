@@ -42,6 +42,8 @@ export interface PriceData {
   updated_at: string;
 }
 
+import { fetchWithRetry } from '@/utils/networkErrorHandler'
+
 class PriceService {
   private apiKey: string;
   private baseUrl = 'https://api.coingecko.com/api/v3';
@@ -51,36 +53,12 @@ class PriceService {
     this.apiKey = import.meta.env.VITE_COINGECKO_KEY || '';
   }
 
-  private async fetchWithRetry(url: string, retries = 3): Promise<Response> {
-    for (let i = 0; i < retries; i++) {
-      try {
-        const response = await fetch(url, {
-          headers: this.apiKey ? {
-            'X-CG-Pro-API-Key': this.apiKey
-          } : {}
-        });
-        
-        if (!response.ok && response.status === 429) {
-          // Rate limit - wait and retry
-          await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
-          continue;
-        }
-        
-        return response;
-      } catch (error) {
-        if (i === retries - 1) throw error;
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-    }
-    throw new Error('Max retries exceeded');
-  }
-
   /**
    * Fetch current prices for top cryptocurrencies
    */
   async fetchTopCryptoPrices(limit = 100): Promise<CoinGeckoPrice[]> {
     try {
-      const response = await this.fetchWithRetry(
+      const response = await fetchWithRetry(
         `${this.baseUrl}/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=${limit}&page=1&sparkline=false&locale=en`
       );
       
@@ -103,7 +81,7 @@ class PriceService {
     
     try {
       const idsParam = coinIds.join(',');
-      const response = await this.fetchWithRetry(
+      const response = await fetchWithRetry(
         `${this.baseUrl}/coins/markets?vs_currency=usd&ids=${idsParam}&order=market_cap_desc&per_page=250&page=1&sparkline=false&locale=en`
       );
       
@@ -123,7 +101,7 @@ class PriceService {
    */
   async getCurrentPrice(coinId: string): Promise<number> {
     try {
-      const response = await this.fetchWithRetry(
+      const response = await fetchWithRetry(
         `${this.baseUrl}/simple/price?ids=${coinId}&vs_currencies=usd`
       );
       
@@ -188,19 +166,15 @@ class PriceService {
    */
   async updateAllPrices(): Promise<void> {
     try {
-      console.log('Fetching latest cryptocurrency prices...');
-      
-      // Get top 100 cryptocurrencies
-      const coinGeckoData = await this.fetchTopCryptoPrices(100);
-      const priceData = this.transformPriceData(coinGeckoData);
-      
-      // Update database
-      await this.updatePricesInDatabase(priceData);
-      
-      console.log('Price update completed successfully');
+      // Delegate to secure serverless function; client should not write to DB
+      const res = await fetchWithRetry('/.netlify/functions/admin-refresh-prices', { method: 'POST' })
+      if (!res.ok) {
+        throw new Error(`admin-refresh-prices failed: ${res.status}`)
+      }
+      console.log('Triggered server-side price refresh')
     } catch (error) {
-      console.error('Error updating prices:', error);
-      throw error;
+      console.error('Error triggering server-side price refresh:', error)
+      throw error
     }
   }
 
@@ -292,7 +266,7 @@ class PriceService {
     if (query.length < 2) return [];
 
     try {
-      const response = await this.fetchWithRetry(
+      const response = await fetchWithRetry(
         `${this.baseUrl}/search?query=${encodeURIComponent(query)}`
       );
 

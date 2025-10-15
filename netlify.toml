@@ -10,6 +10,16 @@
 [build.environment]
   NPM_FLAGS = "--production=false"
 
+# Security headers
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' https://api.coingecko.com; connect-src 'self' https://*.supabase.co https://api.coingecko.com; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; frame-ancestors 'none';"
+    Referrer-Policy = "no-referrer"
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    Permissions-Policy = "geolocation=(), microphone=(), camera=()"
+
 [[headers]]
   for = "/static/*"
   [headers.values]
