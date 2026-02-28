@@ -4,48 +4,144 @@ import { toast } from 'sonner';
 import { supabase, supabaseEnabled } from '@/lib/supabase';
 import { userPreferencesManager } from '@/utils/statePersistence';
 
-const LOCAL_SESSION_KEY = 'cryptotracker_user_session';
+// ---------------------------------------------------------------------------
+// Local auth storage (used when Supabase is not configured)
+// ---------------------------------------------------------------------------
+const USERS_KEY = 'cryptotracker_users';
+const SESSION_KEY = 'cryptotracker_user_session';
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+const PBKDF2_ITERATIONS = 100_000;
 
-// ---------------------------------------------------------------------------
-// Demo-mode helpers (used when no Supabase project is configured)
-// ---------------------------------------------------------------------------
-function makeDemoUser(email: string): User {
-  return {
-    id: `demo_${email.replace(/[^a-z0-9]/gi, '_')}`,
-    email,
-    email_confirmed_at: new Date().toISOString(),
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    user_metadata: { name: email.split('@')[0] },
-    app_metadata: { provider: 'email', providers: ['email'] },
-    aud: 'authenticated',
-    role: 'authenticated',
-  } as User;
+interface StoredUser {
+  id: string;
+  email: string;
+  passwordHash: string;  // hex-encoded PBKDF2 output
+  passwordSalt: string;  // hex-encoded random salt
+  name: string;
+  createdAt: string;
 }
 
-function saveDemoSession(user: User) {
-  localStorage.setItem(LOCAL_SESSION_KEY, JSON.stringify({ user, timestamp: Date.now() }));
+function bytesToHex(bytes: Uint8Array): string {
+  return Array.from(bytes)
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
 }
 
-function loadDemoSession(): User | null {
+function hexToBytes(hex: string): Uint8Array {
+  return Uint8Array.from((hex.match(/.{2}/g) ?? []).map(h => parseInt(h, 16)));
+}
+
+async function deriveKey(
+  password: string,
+  salt: Uint8Array
+): Promise<string> {
+  const encoder = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(password),
+    'PBKDF2',
+    false,
+    ['deriveBits']
+  );
+  const hashBuffer = await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', salt, iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' },
+    keyMaterial,
+    256
+  );
+  return bytesToHex(new Uint8Array(hashBuffer));
+}
+
+async function hashPassword(
+  password: string,
+  saltHex?: string
+): Promise<{ hash: string; saltHex: string }> {
+  const salt = saltHex
+    ? hexToBytes(saltHex)
+    : crypto.getRandomValues(new Uint8Array(16));
+  const hash = await deriveKey(password, salt);
+  return { hash, saltHex: bytesToHex(salt) };
+}
+
+function generateId(): string {
+  const arr = new Uint8Array(16);
+  crypto.getRandomValues(arr);
+  return bytesToHex(arr);
+}
+
+function getStoredUsers(): Record<string, StoredUser> {
   try {
-    const raw = localStorage.getItem(LOCAL_SESSION_KEY);
+    const raw = localStorage.getItem(USERS_KEY);
+    return raw ? (JSON.parse(raw) as Record<string, StoredUser>) : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveStoredUser(user: StoredUser): void {
+  const users = getStoredUsers();
+  users[user.id] = user;
+  localStorage.setItem(USERS_KEY, JSON.stringify(users));
+}
+
+function findUserByEmail(email: string): StoredUser | null {
+  const users = getStoredUsers();
+  return (
+    Object.values(users).find(
+      u => u.email.toLowerCase() === email.toLowerCase()
+    ) ?? null
+  );
+}
+
+function updateStoredUser(id: string, updates: Partial<StoredUser>): void {
+  const users = getStoredUsers();
+  if (users[id]) {
+    users[id] = { ...users[id], ...updates };
+    localStorage.setItem(USERS_KEY, JSON.stringify(users));
+  }
+}
+
+function saveSession(user: User): void {
+  localStorage.setItem(
+    SESSION_KEY,
+    JSON.stringify({ user, timestamp: Date.now() })
+  );
+}
+
+function loadSession(): User | null {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
     if (!raw) return null;
-    const { user, timestamp } = JSON.parse(raw) as { user: User; timestamp: number };
+    const { user, timestamp } = JSON.parse(raw) as {
+      user: User;
+      timestamp: number;
+    };
     if (Date.now() - timestamp > SESSION_TTL_MS) {
-      localStorage.removeItem(LOCAL_SESSION_KEY);
+      localStorage.removeItem(SESSION_KEY);
       return null;
     }
     return user;
   } catch {
-    localStorage.removeItem(LOCAL_SESSION_KEY);
+    localStorage.removeItem(SESSION_KEY);
     return null;
   }
 }
 
-function clearDemoSession() {
-  localStorage.removeItem(LOCAL_SESSION_KEY);
+function clearSession(): void {
+  localStorage.removeItem(SESSION_KEY);
+}
+
+function makeUserFromStored(stored: StoredUser): User {
+  return {
+    id: stored.id,
+    email: stored.email,
+    email_confirmed_at: stored.createdAt,
+    created_at: stored.createdAt,
+    updated_at: stored.createdAt,
+    user_metadata: { name: stored.name },
+    app_metadata: { provider: 'email', providers: ['email'] },
+    aud: 'authenticated',
+    role: 'authenticated',
+  } as User;
 }
 
 // ---------------------------------------------------------------------------
@@ -56,11 +152,26 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   isDemo: boolean;
-  signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  signUp: (email: string, password: string, name?: string) => Promise<{ success: boolean; error?: string; needsVerification?: boolean }>;
+  signIn: (
+    email: string,
+    password: string
+  ) => Promise<{ success: boolean; error?: string }>;
+  signUp: (
+    email: string,
+    password: string,
+    name?: string
+  ) => Promise<{
+    success: boolean;
+    error?: string;
+    needsVerification?: boolean;
+  }>;
   signOut: () => Promise<void>;
-  resendVerificationEmail: (email: string) => Promise<{ success: boolean; error?: string }>;
-  resetPassword: (email: string) => Promise<{ success: boolean; error?: string }>;
+  resendVerificationEmail: (
+    email: string
+  ) => Promise<{ success: boolean; error?: string }>;
+  resetPassword: (
+    email: string
+  ) => Promise<{ success: boolean; error?: string }>;
   updateProfile: (updates: Record<string, unknown>) => Promise<boolean>;
 }
 
@@ -70,7 +181,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  // isDemo is the inverse of supabaseEnabled — exported so UI can show a banner
+  // isDemo reflects whether Supabase is configured; local auth is fully
+  // functional either way — no "demo" limitations.
   const isDemo = !supabaseEnabled;
 
   // -------------------------------------------------------------------------
@@ -78,8 +190,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // -------------------------------------------------------------------------
   useEffect(() => {
     if (!supabaseEnabled) {
-      // Demo mode: restore from localStorage
-      const savedUser = loadDemoSession();
+      // Local auth mode: restore session from localStorage
+      const savedUser = loadSession();
       if (savedUser) {
         setUser(savedUser);
         userPreferencesManager.updatePreferences({ theme: 'dark', currency: 'usd' });
@@ -98,7 +210,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
@@ -115,20 +229,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     password: string
   ): Promise<{ success: boolean; error?: string }> => {
     if (!supabaseEnabled) {
-      // Demo mode: accept any credentials with minimal validation
-      if (!email || !password || password.length < 6) {
-        return { success: false, error: 'Invalid credentials. Password must be at least 6 characters.' };
+      if (!email || !password) {
+        return { success: false, error: 'Email and password are required.' };
       }
-      const demoUser = makeDemoUser(email);
-      saveDemoSession(demoUser);
-      setUser(demoUser);
+      if (password.length < 6) {
+        return {
+          success: false,
+          error: 'Password must be at least 6 characters.',
+        };
+      }
+      const stored = findUserByEmail(email);
+      if (!stored) {
+        return {
+          success: false,
+          error: 'No account found with this email. Please sign up first.',
+        };
+      }
+      const { hash } = await hashPassword(password, stored.passwordSalt);
+      if (hash !== stored.passwordHash) {
+        return { success: false, error: 'Invalid password.' };
+      }
+      const u = makeUserFromStored(stored);
+      saveSession(u);
+      setUser(u);
       userPreferencesManager.updatePreferences({ theme: 'dark', currency: 'usd' });
-      toast.success('Signed in (demo mode)');
+      toast.success('Successfully signed in!');
       return { success: true };
     }
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
       if (error) return { success: false, error: error.message };
       if (data.user) {
         userPreferencesManager.updatePreferences({ theme: 'dark', currency: 'usd' });
@@ -136,8 +269,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { success: true };
       }
       return { success: false, error: 'Sign in failed. Please try again.' };
-    } catch (error) {
-      console.error('Login failed:', error);
+    } catch (err) {
+      console.error('Login failed:', err);
       return { success: false, error: 'Login failed. Please try again.' };
     }
   };
@@ -149,18 +282,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     email: string,
     password: string,
     name?: string
-  ): Promise<{ success: boolean; error?: string; needsVerification?: boolean }> => {
+  ): Promise<{
+    success: boolean;
+    error?: string;
+    needsVerification?: boolean;
+  }> => {
     if (!supabaseEnabled) {
-      // Demo mode: create account immediately
-      if (!email || !password || password.length < 6) {
-        return { success: false, error: 'Invalid details. Password must be at least 6 characters.' };
+      if (!email || !password) {
+        return { success: false, error: 'Email and password are required.' };
       }
-      const demoUser = makeDemoUser(email);
-      if (name) (demoUser.user_metadata as Record<string, unknown>).name = name;
-      saveDemoSession(demoUser);
-      setUser(demoUser);
+      if (password.length < 6) {
+        return {
+          success: false,
+          error: 'Password must be at least 6 characters.',
+        };
+      }
+      const existing = findUserByEmail(email);
+      if (existing) {
+        return {
+          success: false,
+          error: 'An account with this email already exists.',
+        };
+      }
+      const { hash, saltHex } = await hashPassword(password);
+      const id = generateId();
+      const createdAt = new Date().toISOString();
+      const stored: StoredUser = {
+        id,
+        email,
+        passwordHash: hash,
+        passwordSalt: saltHex,
+        name: name || email.split('@')[0],
+        createdAt,
+      };
+      saveStoredUser(stored);
+      const u = makeUserFromStored(stored);
+      saveSession(u);
+      setUser(u);
       userPreferencesManager.updatePreferences({ theme: 'dark', currency: 'usd' });
-      toast.success('Account created (demo mode)');
+      toast.success('Account created successfully!');
       return { success: true, needsVerification: false };
     }
 
@@ -172,19 +332,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       if (error) return { success: false, error: error.message };
       if (data.user) {
-        const needsVerification = !data.user.email_confirmed_at && !data.session;
+        const needsVerification =
+          !data.user.email_confirmed_at && !data.session;
         if (needsVerification) {
-          toast.success('Account created! Please check your email to verify your account.');
+          toast.success(
+            'Account created! Please check your email to verify your account.'
+          );
         } else {
           userPreferencesManager.updatePreferences({ theme: 'dark', currency: 'usd' });
           toast.success('Account created successfully!');
         }
         return { success: true, needsVerification };
       }
-      return { success: false, error: 'Account creation failed. Please try again.' };
-    } catch (error) {
-      console.error('Account creation failed:', error);
-      return { success: false, error: 'Account creation failed. Please try again.' };
+      return {
+        success: false,
+        error: 'Account creation failed. Please try again.',
+      };
+    } catch (err) {
+      console.error('Account creation failed:', err);
+      return {
+        success: false,
+        error: 'Account creation failed. Please try again.',
+      };
     }
   };
 
@@ -193,7 +362,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // -------------------------------------------------------------------------
   const signOut = async () => {
     if (!supabaseEnabled) {
-      clearDemoSession();
+      clearSession();
       setUser(null);
       setSession(null);
       toast.success('Signed out successfully');
@@ -203,8 +372,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
       toast.success('Signed out successfully');
-    } catch (error) {
-      console.error('Sign out error:', error);
+    } catch (err) {
+      console.error('Sign out error:', err);
       toast.error('Error signing out');
     }
   };
@@ -218,7 +387,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!supabaseEnabled) return { success: true };
     return {
       success: false,
-      error: 'Please use the sign-up form again or contact support to resend your verification email.',
+      error:
+        'Please use the sign-up form again or contact support to resend your verification email.',
     };
   };
 
@@ -229,7 +399,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     email: string
   ): Promise<{ success: boolean; error?: string }> => {
     if (!supabaseEnabled) {
-      toast.info('Password reset is only available when Supabase is configured.');
+      // Always return a generic success to prevent email-enumeration attacks.
+      toast.info(
+        'If an account exists for this email, you will receive reset instructions. Please contact support for further assistance.'
+      );
       return { success: true };
     }
     try {
@@ -239,21 +412,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (error) return { success: false, error: error.message };
       toast.success('Password reset email sent! Check your inbox.');
       return { success: true };
-    } catch (error) {
-      console.error('Password reset failed:', error);
-      return { success: false, error: 'Password reset failed. Please try again.' };
+    } catch (err) {
+      console.error('Password reset failed:', err);
+      return {
+        success: false,
+        error: 'Password reset failed. Please try again.',
+      };
     }
   };
 
   // -------------------------------------------------------------------------
   // updateProfile
   // -------------------------------------------------------------------------
-  const updateProfile = async (updates: Record<string, unknown>): Promise<boolean> => {
+  const updateProfile = async (
+    updates: Record<string, unknown>
+  ): Promise<boolean> => {
     if (!supabaseEnabled) {
       if (user) {
-        const updated = { ...user, user_metadata: { ...user.user_metadata, ...updates } };
+        const name =
+          typeof updates.name === 'string' ? updates.name : undefined;
+        if (name) updateStoredUser(user.id, { name });
+        const updated: User = {
+          ...user,
+          user_metadata: { ...user.user_metadata, ...updates },
+          updated_at: new Date().toISOString(),
+        };
         setUser(updated);
-        saveDemoSession(updated);
+        saveSession(updated);
         toast.success('Profile updated');
       }
       return true;
@@ -266,25 +451,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       toast.success('Profile updated successfully');
       return true;
-    } catch (error) {
-      console.error('Profile update failed:', error);
+    } catch (err) {
+      console.error('Profile update failed:', err);
       return false;
     }
   };
 
   return (
-    <AuthContext.Provider value={{
-      user,
-      session,
-      loading,
-      isDemo,
-      signIn,
-      signUp,
-      signOut,
-      resendVerificationEmail,
-      resetPassword,
-      updateProfile,
-    }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        session,
+        loading,
+        isDemo,
+        signIn,
+        signUp,
+        signOut,
+        resendVerificationEmail,
+        resetPassword,
+        updateProfile,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

@@ -1,5 +1,10 @@
 import '@testing-library/jest-dom';
 import { jest } from '@jest/globals';
+import { TextEncoder, TextDecoder } from 'util';
+
+// Polyfill TextEncoder/TextDecoder (not available in jsdom by default)
+(global as any).TextEncoder = TextEncoder;
+(global as any).TextDecoder = TextDecoder;
 
 // Mock environment variables
 process.env.VITE_SUPABASE_URL = 'https://mock-supabase-url.supabase.co';
@@ -42,10 +47,49 @@ Object.defineProperty(window, 'matchMedia', {
 // Mock crypto
 Object.defineProperty(global as any, 'crypto', {
   value: {
-    getRandomValues: jest.fn(() => new Uint8Array(32)),
-    subtle: {},
+    getRandomValues: jest.fn((arr: Uint8Array) => {
+      for (let i = 0; i < arr.length; i++) arr[i] = i % 256;
+      return arr;
+    }),
+    subtle: {
+      // importKey: store the raw password bytes in the returned key handle
+      importKey: jest.fn(async (_format: string, data: BufferSource) => {
+        const src = data instanceof ArrayBuffer
+          ? new Uint8Array(data)
+          : new Uint8Array(
+              (data as ArrayBufferView).buffer,
+              (data as ArrayBufferView).byteOffset,
+              (data as ArrayBufferView).byteLength
+            );
+        return { _keyBytes: Array.from(src) };
+      }),
+      // deriveBits: combine password bytes + salt deterministically so that
+      // different passwords always produce different hashes
+      deriveBits: jest.fn(async (params: any, keyMaterial: any, bits: number) => {
+        const out = new Uint8Array(bits / 8);
+        const saltSrc: BufferSource = params.salt;
+        const saltBytes = saltSrc instanceof ArrayBuffer
+          ? new Uint8Array(saltSrc)
+          : new Uint8Array(
+              (saltSrc as ArrayBufferView).buffer,
+              (saltSrc as ArrayBufferView).byteOffset ?? 0,
+              (saltSrc as ArrayBufferView).byteLength
+            );
+        const keyBytes: number[] = keyMaterial._keyBytes ?? [];
+        // Mix password bytes — position-weighted so order matters
+        keyBytes.forEach((b, i) => {
+          out[i % out.length] = (out[i % out.length] + b * (i + 1)) % 256;
+        });
+        // XOR with salt to make each salt produce a unique result
+        saltBytes.forEach((b, i) => {
+          out[(i + 8) % out.length] ^= b;
+        });
+        return out.buffer;
+      }),
+    },
   },
   configurable: true,
+  writable: true,
 });
 
 // Mock fetch globally

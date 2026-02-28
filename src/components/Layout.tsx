@@ -80,7 +80,7 @@ export function Layout({ children }: LayoutProps) {
       </a>
       
       <SidebarProvider>
-        <div className="min-h-screen flex w-full bg-background touch-optimized">
+        <div className="h-screen flex w-full bg-background overflow-hidden">
           <AppSidebar />
           
           <div className="flex-1 flex flex-col mobile-safe-area">

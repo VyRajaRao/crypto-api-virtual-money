@@ -666,10 +666,18 @@
   html {
     scroll-behavior: smooth;
   }
+
+  /* Hide scrollbars globally while keeping scroll functionality */
+  * {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  *::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 @layer components {
-  /* Neon glow effects */
   .glow-primary {
     box-shadow: 0 0 20px hsl(var(--primary) / 0.3);
   }

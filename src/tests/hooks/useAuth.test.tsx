@@ -39,27 +39,26 @@ describe('useAuth', () => {
     expect(result.current.user).toBeNull();
   });
 
-  // In the Jest environment there are no VITE_* env vars, so SUPABASE_CONFIGURED
-  // is always false — i.e. the hook runs in demo/local mode.
-  describe('Demo mode (no Supabase credentials — default in tests)', () => {
-    it('should expose isDemo = true', async () => {
+  // In the Jest environment supabaseEnabled === false, so the hook runs
+  // in local-auth mode (real credential-based auth using localStorage).
+  describe('Local auth mode (no Supabase credentials — default in tests)', () => {
+    it('should expose isDemo = true when Supabase is not configured', async () => {
       const { result } = renderHook(() => useAuth(), { wrapper });
       await waitFor(() => expect(result.current.loading).toBe(false));
       expect(result.current.isDemo).toBe(true);
     });
 
-    it('should sign in with any valid email and password', async () => {
+    it('should reject sign-in when the user has not registered', async () => {
       const { result } = renderHook(() => useAuth(), { wrapper });
       await waitFor(() => expect(result.current.loading).toBe(false));
 
-      let response: { success: boolean; error?: string } = { success: false };
+      let response: { success: boolean; error?: string } = { success: true };
       await act(async () => {
-        response = await result.current.signIn('test@example.com', 'password123');
+        response = await result.current.signIn('unknown@example.com', 'password123');
       });
 
-      expect(response.success).toBe(true);
-      expect(result.current.user).not.toBeNull();
-      expect(result.current.user?.email).toBe('test@example.com');
+      expect(response.success).toBe(false);
+      expect(response.error).toMatch(/no account/i);
     });
 
     it('should reject sign-in when password is shorter than 6 characters', async () => {
@@ -113,17 +112,88 @@ describe('useAuth', () => {
       expect(response.success).toBe(false);
     });
 
+    it('should reject duplicate sign-up for the same email', async () => {
+      // Mock getItem to return an existing user registry
+      const existingUsers = {
+        'abc123': {
+          id: 'abc123',
+          email: 'existing@example.com',
+          passwordHash: 'fakehash',
+          name: 'Existing',
+          createdAt: new Date().toISOString(),
+        },
+      };
+      jest.spyOn(Storage.prototype, 'getItem').mockImplementation((key: string) => {
+        if (key === 'cryptotracker_users') return JSON.stringify(existingUsers);
+        return null;
+      });
+
+      const { result } = renderHook(() => useAuth(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      let response: { success: boolean; error?: string } = { success: true };
+      await act(async () => {
+        response = await result.current.signUp('existing@example.com', 'password123');
+      });
+
+      expect(response.success).toBe(false);
+      expect(response.error).toMatch(/already exists/i);
+      jest.spyOn(Storage.prototype, 'getItem').mockRestore();
+    });
+
+    it('should sign in successfully after sign-up', async () => {
+      const { result } = renderHook(() => useAuth(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      // Sign up first
+      await act(async () => {
+        await result.current.signUp('user@example.com', 'mypassword', 'User');
+      });
+      expect(result.current.user?.email).toBe('user@example.com');
+
+      // Sign out
+      await act(async () => {
+        await result.current.signOut();
+      });
+      expect(result.current.user).toBeNull();
+
+      // Sign in with the same credentials
+      let response: { success: boolean; error?: string } = { success: false };
+      await act(async () => {
+        response = await result.current.signIn('user@example.com', 'mypassword');
+      });
+      expect(response.success).toBe(true);
+      expect(result.current.user?.email).toBe('user@example.com');
+    });
+
+    it('should reject sign-in with wrong password', async () => {
+      const { result } = renderHook(() => useAuth(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      await act(async () => {
+        await result.current.signUp('user2@example.com', 'correctpassword');
+      });
+      await act(async () => {
+        await result.current.signOut();
+      });
+
+      let response: { success: boolean; error?: string } = { success: true };
+      await act(async () => {
+        response = await result.current.signIn('user2@example.com', 'wrongpassword');
+      });
+      expect(response.success).toBe(false);
+      expect(response.error).toMatch(/invalid password/i);
+    });
+
     it('should sign out and clear user state', async () => {
       const { result } = renderHook(() => useAuth(), { wrapper });
       await waitFor(() => expect(result.current.loading).toBe(false));
 
-      // Sign in first
       await act(async () => {
-        await result.current.signIn('test@example.com', 'password123');
+        await result.current.signUp('test@example.com', 'password123');
       });
       expect(result.current.user).not.toBeNull();
 
-      // Sign out
       await act(async () => {
         await result.current.signOut();
       });
@@ -135,7 +205,7 @@ describe('useAuth', () => {
       await waitFor(() => expect(result.current.loading).toBe(false));
 
       await act(async () => {
-        await result.current.signIn('test@example.com', 'password123');
+        await result.current.signUp('test@example.com', 'password123');
       });
 
       let ok = false;
@@ -146,21 +216,13 @@ describe('useAuth', () => {
       expect(ok).toBe(true);
     });
 
-    it('should return success from resetPassword (info-only in demo mode)', async () => {
+    it('should not call Supabase signInWithPassword when in local auth mode', async () => {
       const { result } = renderHook(() => useAuth(), { wrapper });
       await waitFor(() => expect(result.current.loading).toBe(false));
 
-      let response: { success: boolean; error?: string } = { success: false };
       await act(async () => {
-        response = await result.current.resetPassword('test@example.com');
+        await result.current.signUp('test@example.com', 'password123');
       });
-      expect(response.success).toBe(true);
-    });
-
-    it('should not call Supabase signInWithPassword in demo mode', async () => {
-      const { result } = renderHook(() => useAuth(), { wrapper });
-      await waitFor(() => expect(result.current.loading).toBe(false));
-
       await act(async () => {
         await result.current.signIn('test@example.com', 'password123');
       });
@@ -168,11 +230,14 @@ describe('useAuth', () => {
       expect(mockSupabase.auth.signInWithPassword).not.toHaveBeenCalled();
     });
 
-    it('should restore a saved demo session on mount', async () => {
+    it('should restore a saved session on mount', async () => {
       const savedUser = { ...mockUser, email: 'saved@example.com' };
-      const spy = jest.spyOn(Storage.prototype, 'getItem').mockReturnValueOnce(
-        JSON.stringify({ user: savedUser, timestamp: Date.now() })
-      );
+      const spy = jest.spyOn(Storage.prototype, 'getItem').mockImplementation((key: string) => {
+        if (key === 'cryptotracker_user_session') {
+          return JSON.stringify({ user: savedUser, timestamp: Date.now() });
+        }
+        return null;
+      });
 
       const { result } = renderHook(() => useAuth(), { wrapper });
       await waitFor(() => expect(result.current.loading).toBe(false));
@@ -181,12 +246,15 @@ describe('useAuth', () => {
       spy.mockRestore();
     });
 
-    it('should discard an expired demo session on mount', async () => {
+    it('should discard an expired session on mount', async () => {
       const savedUser = { ...mockUser };
       const expiredTimestamp = Date.now() - 31 * 24 * 60 * 60 * 1000; // 31 days ago
-      const spy = jest.spyOn(Storage.prototype, 'getItem').mockReturnValueOnce(
-        JSON.stringify({ user: savedUser, timestamp: expiredTimestamp })
-      );
+      const spy = jest.spyOn(Storage.prototype, 'getItem').mockImplementation((key: string) => {
+        if (key === 'cryptotracker_user_session') {
+          return JSON.stringify({ user: savedUser, timestamp: expiredTimestamp });
+        }
+        return null;
+      });
 
       const { result } = renderHook(() => useAuth(), { wrapper });
       await waitFor(() => expect(result.current.loading).toBe(false));
