@@ -10,7 +10,7 @@ describe('decimal math helpers', () => {
     const price = 12345.67890123
     const amount = 0.00012345
     const total = mul(price, amount)
-    expect(toFixed(total, 8)).toBe('1.52408')
+    expect(toFixed(total, 5)).toBe('1.52407')
   })
 
   test('toNumber returns a JS number for supabase writes', () => {

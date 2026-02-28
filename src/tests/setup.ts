@@ -1,10 +1,14 @@
 import '@testing-library/jest-dom';
 import { jest } from '@jest/globals';
-import { setupServer } from 'msw/node';
-import * as msw from 'msw';
-const { rest } = msw as any;
+import { TextEncoder, TextDecoder } from 'util';
+
+// Polyfill TextEncoder/TextDecoder (not available in jsdom by default)
+(global as any).TextEncoder = TextEncoder;
+(global as any).TextDecoder = TextDecoder;
 
 // Mock environment variables
+process.env.VITE_SUPABASE_URL = 'https://mock-supabase-url.supabase.co';
+process.env.VITE_SUPABASE_ANON_KEY = 'mock-supabase-anon-key';
 process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://mock-supabase-url.supabase.co';
 process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'mock-supabase-anon-key';
 process.env.NEXT_PUBLIC_COINGECKO_API_KEY = 'mock-coingecko-api-key';
@@ -32,8 +36,8 @@ Object.defineProperty(window, 'matchMedia', {
     matches: false,
     media: query,
     onchange: null,
-    addListener: jest.fn(), // deprecated
-    removeListener: jest.fn(), // deprecated
+    addListener: jest.fn(),
+    removeListener: jest.fn(),
     addEventListener: jest.fn(),
     removeEventListener: jest.fn(),
     dispatchEvent: jest.fn(),
@@ -43,142 +47,73 @@ Object.defineProperty(window, 'matchMedia', {
 // Mock crypto
 Object.defineProperty(global as any, 'crypto', {
   value: {
-    getRandomValues: jest.fn(() => new Uint8Array(32)),
+    getRandomValues: jest.fn((arr: Uint8Array) => {
+      for (let i = 0; i < arr.length; i++) arr[i] = i % 256;
+      return arr;
+    }),
+    subtle: {
+      // importKey: store the raw password bytes in the returned key handle
+      importKey: jest.fn(async (_format: string, data: BufferSource) => {
+        const src = data instanceof ArrayBuffer
+          ? new Uint8Array(data)
+          : new Uint8Array(
+              (data as ArrayBufferView).buffer,
+              (data as ArrayBufferView).byteOffset,
+              (data as ArrayBufferView).byteLength
+            );
+        return { _keyBytes: Array.from(src) };
+      }),
+      // deriveBits: combine password bytes + salt deterministically so that
+      // different passwords always produce different hashes
+      deriveBits: jest.fn(async (params: any, keyMaterial: any, bits: number) => {
+        const out = new Uint8Array(bits / 8);
+        const saltSrc: BufferSource = params.salt;
+        const saltBytes = saltSrc instanceof ArrayBuffer
+          ? new Uint8Array(saltSrc)
+          : new Uint8Array(
+              (saltSrc as ArrayBufferView).buffer,
+              (saltSrc as ArrayBufferView).byteOffset ?? 0,
+              (saltSrc as ArrayBufferView).byteLength
+            );
+        const keyBytes: number[] = keyMaterial._keyBytes ?? [];
+        // Mix password bytes — position-weighted so order matters
+        keyBytes.forEach((b, i) => {
+          out[i % out.length] = (out[i % out.length] + b * (i + 1)) % 256;
+        });
+        // XOR with salt to make each salt produce a unique result
+        saltBytes.forEach((b, i) => {
+          out[(i + 8) % out.length] ^= b;
+        });
+        return out.buffer;
+      }),
+    },
   },
+  configurable: true,
+  writable: true,
 });
 
-// Mock server for API calls
-export const server = setupServer(
-  // CoinGecko API mocks
-  rest.get('https://api.coingecko.com/api/v3/coins/markets', (req, res, ctx) => {
-    return res(
-      ctx.json([
-        {
-          id: 'bitcoin',
-          symbol: 'btc',
-          name: 'Bitcoin',
-          image: 'https://assets.coingecko.com/coins/images/1/large/bitcoin.png',
-          current_price: 50000,
-          market_cap: 1000000000,
-          market_cap_rank: 1,
-          fully_diluted_valuation: 1050000000,
-          total_volume: 30000000,
-          high_24h: 52000,
-          low_24h: 49000,
-          price_change_24h: 1000,
-          price_change_percentage_24h: 2.0,
-          market_cap_change_24h: 20000000,
-          market_cap_change_percentage_24h: 2.0,
-          circulating_supply: 19000000,
-          total_supply: 21000000,
-          max_supply: 21000000,
-          ath: 69000,
-          ath_change_percentage: -27.5,
-          ath_date: '2021-11-10T14:24:11.849Z',
-          atl: 67.81,
-          atl_change_percentage: 73605.4,
-          atl_date: '2013-07-06T00:00:00.000Z',
-          roi: null,
-          last_updated: '2024-01-01T12:00:00.000Z'
-        }
-      ])
-    );
-  }),
-
-  rest.get('https://api.coingecko.com/api/v3/coins/:id', (req, res, ctx) => {
-    const { id } = req.params;
-    return res(
-      ctx.json({
-        id,
-        symbol: 'btc',
-        name: 'Bitcoin',
-        description: {
-          en: 'Bitcoin is a cryptocurrency and worldwide payment system.'
-        },
-        links: {
-          homepage: ['https://bitcoin.org/']
-        },
-        image: {
-          thumb: 'https://assets.coingecko.com/coins/images/1/thumb/bitcoin.png',
-          small: 'https://assets.coingecko.com/coins/images/1/small/bitcoin.png',
-          large: 'https://assets.coingecko.com/coins/images/1/large/bitcoin.png'
-        },
-        market_data: {
-          current_price: {
-            usd: 50000
-          },
-          market_cap: {
-            usd: 1000000000
-          },
-          total_volume: {
-            usd: 30000000
-          }
-        }
-      })
-    );
-  }),
-
-  rest.get('https://api.coingecko.com/api/v3/coins/:id/market_chart', (req, res, ctx) => {
-    const mockData = {
-      prices: Array.from({ length: 30 }, (_, i) => [
-        Date.now() - (29 - i) * 24 * 60 * 60 * 1000,
-        50000 + Math.random() * 10000
-      ]),
-      market_caps: Array.from({ length: 30 }, (_, i) => [
-        Date.now() - (29 - i) * 24 * 60 * 60 * 1000,
-        1000000000 + Math.random() * 100000000
-      ]),
-      total_volumes: Array.from({ length: 30 }, (_, i) => [
-        Date.now() - (29 - i) * 24 * 60 * 60 * 1000,
-        30000000 + Math.random() * 5000000
-      ])
-    };
-    return res(ctx.json(mockData));
-  })
+// Mock fetch globally
+global.fetch = jest.fn(() =>
+  Promise.resolve({
+    ok: true,
+    status: 200,
+    json: () => Promise.resolve([]),
+    text: () => Promise.resolve(''),
+    headers: new Map(),
+  } as unknown as Response)
 );
-
-// Setup server
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-afterEach(() => server.resetHandlers());
-afterAll(() => server.close());
-
-// Mock Next.js router if available
-try {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  require.resolve('next/router');
-  jest.mock('next/router', () => ({
-    useRouter() {
-      return {
-        route: '/',
-        pathname: '/',
-        query: {},
-        asPath: '/',
-        push: jest.fn(() => Promise.resolve(true)),
-        replace: jest.fn(() => Promise.resolve(true)),
-        reload: jest.fn(() => Promise.resolve(true)),
-        back: jest.fn(() => Promise.resolve(true)),
-        prefetch: jest.fn(() => Promise.resolve()),
-        beforePopState: jest.fn(() => Promise.resolve()),
-        events: {
-          on: jest.fn(),
-          off: jest.fn(),
-          emit: jest.fn(),
-        },
-      };
-    },
-  }));
-} catch (e) {
-  // next/router not installed in this project; skip mocking
-}
 
 // Mock Supabase
 jest.mock('@/lib/supabase', () => ({
+  supabaseEnabled: false, // tests run without real credentials → demo mode
   supabase: {
     auth: {
       getSession: jest.fn(() => Promise.resolve({ data: { session: null }, error: null })),
-      signUp: jest.fn(() => Promise.resolve({ data: { user: null }, error: null })),
-      signInWithPassword: jest.fn(() => Promise.resolve({ data: { user: null }, error: null })),
+      signUp: jest.fn(() => Promise.resolve({ data: { user: null, session: null }, error: null })),
+      signInWithPassword: jest.fn(() => Promise.resolve({ data: { user: null, session: null }, error: null })),
       signOut: jest.fn(() => Promise.resolve({ error: null })),
+      updateUser: jest.fn(() => Promise.resolve({ data: { user: null }, error: null })),
+      resetPasswordForEmail: jest.fn(() => Promise.resolve({ data: {}, error: null })),
       onAuthStateChange: jest.fn(() => ({
         data: { subscription: { unsubscribe: jest.fn() } }
       })),
@@ -192,7 +127,9 @@ jest.mock('@/lib/supabase', () => ({
       order: jest.fn().mockReturnThis(),
       limit: jest.fn().mockReturnThis(),
       single: jest.fn(() => Promise.resolve({ data: null, error: null })),
-      then: jest.fn((callback: any) => callback({ data: [], error: null })),
+      then: jest.fn((callback: (r: { data: unknown[]; error: null }) => void) =>
+        Promise.resolve({ data: [], error: null }).then(callback)
+      ),
     })),
     storage: {
       from: jest.fn(() => ({
@@ -280,3 +217,4 @@ afterEach(() => {
   localStorageMock.clear();
   sessionStorageMock.clear();
 });
+

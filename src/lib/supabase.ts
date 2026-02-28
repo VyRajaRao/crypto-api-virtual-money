@@ -63,3 +63,10 @@ const createSupabaseClient = () => {
 }
 
 export const supabase = createSupabaseClient()
+
+/**
+ * True when both VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are provided.
+ * Exported so that consumers (e.g. useAuth) can branch their logic without
+ * referencing import.meta.env directly (which would break Jest).
+ */
+export const supabaseEnabled = !!(supabaseUrl && supabaseAnonKey)

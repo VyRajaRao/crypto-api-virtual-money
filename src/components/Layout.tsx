@@ -80,7 +80,7 @@ export function Layout({ children }: LayoutProps) {
       </a>
       
       <SidebarProvider>
-        <div className="min-h-screen flex w-full bg-background touch-optimized">
+        <div className="h-screen flex w-full bg-background overflow-hidden">
           <AppSidebar />
           
           <div className="flex-1 flex flex-col mobile-safe-area">
@@ -175,7 +175,7 @@ export function Layout({ children }: LayoutProps) {
             {/* Main Content */}
             <main 
               id="main-content"
-              className="flex-1 overflow-auto mobile-scrollable overscroll-contain landscape:overflow-y-auto"
+              className="flex-1 overflow-y-auto overscroll-contain"
               role="main"
               tabIndex={-1}
             >

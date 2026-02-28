@@ -1,202 +1,266 @@
+import React from 'react';
 import { renderHook, act, waitFor } from '@testing-library/react';
-import { useAuth } from '@/hooks/useAuth';
+import { AuthProvider, useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { createMockUser } from '../setup';
 
-// Mock the supabase client
-jest.mock('@/lib/supabase');
+// supabase is mocked in setup.ts via jest.mock('@/lib/supabase')
+const mockSupabase = supabase as jest.Mocked<typeof supabase>;
+
+const wrapper = ({ children }: { children: React.ReactNode }) => (
+  <AuthProvider>{children}</AuthProvider>
+);
 
 describe('useAuth', () => {
   const mockUser = createMockUser();
-  const mockSupabase = supabase as jest.Mocked<typeof supabase>;
 
   beforeEach(() => {
     jest.clearAllMocks();
+    (mockSupabase.auth.getSession as jest.Mock).mockResolvedValue({
+      data: { session: null },
+      error: null,
+    });
+    (mockSupabase.auth.onAuthStateChange as jest.Mock).mockReturnValue({
+      data: { subscription: { unsubscribe: jest.fn() } },
+    });
   });
 
-  it('should initialize with loading state', () => {
-    const { result } = renderHook(() => useAuth());
+  it('should throw when used outside AuthProvider', () => {
+    const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    expect(() => renderHook(() => useAuth())).toThrow(
+      'useAuth must be used within an AuthProvider'
+    );
+    spy.mockRestore();
+  });
 
-    expect(result.current.loading).toBe(true);
+  it('should initialise with loading state then settle', async () => {
+    const { result } = renderHook(() => useAuth(), { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.user).toBeNull();
-    expect(result.current.session).toBeNull();
   });
 
-  it('should handle successful sign up', async () => {
-    mockSupabase.auth.signUp.mockResolvedValue({
-      data: { user: mockUser, session: null },
-      error: null
+  // In the Jest environment supabaseEnabled === false, so the hook runs
+  // in local-auth mode (real credential-based auth using localStorage).
+  describe('Local auth mode (no Supabase credentials — default in tests)', () => {
+    it('should expose isDemo = true when Supabase is not configured', async () => {
+      const { result } = renderHook(() => useAuth(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      expect(result.current.isDemo).toBe(true);
     });
 
-    const { result } = renderHook(() => useAuth());
+    it('should reject sign-in when the user has not registered', async () => {
+      const { result } = renderHook(() => useAuth(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
 
-    await act(async () => {
-      const success = await result.current.signUp('test@example.com', 'password123');
-      expect(success).toBe(true);
+      let response: { success: boolean; error?: string } = { success: true };
+      await act(async () => {
+        response = await result.current.signIn('unknown@example.com', 'password123');
+      });
+
+      expect(response.success).toBe(false);
+      expect(response.error).toMatch(/no account/i);
     });
 
-    expect(mockSupabase.auth.signUp).toHaveBeenCalledWith({
-      email: 'test@example.com',
-      password: 'password123'
-    });
-  });
+    it('should reject sign-in when password is shorter than 6 characters', async () => {
+      const { result } = renderHook(() => useAuth(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
 
-  it('should handle sign up error', async () => {
-    const mockError = { message: 'Email already exists' };
-    mockSupabase.auth.signUp.mockResolvedValue({
-      data: { user: null, session: null },
-      error: mockError
-    });
+      let response: { success: boolean; error?: string } = { success: true };
+      await act(async () => {
+        response = await result.current.signIn('test@example.com', 'abc');
+      });
 
-    const { result } = renderHook(() => useAuth());
-
-    await act(async () => {
-      const success = await result.current.signUp('test@example.com', 'password123');
-      expect(success).toBe(false);
-    });
-  });
-
-  it('should handle successful sign in', async () => {
-    const mockSession = { user: mockUser, access_token: 'mock-token' };
-    mockSupabase.auth.signInWithPassword.mockResolvedValue({
-      data: { user: mockUser, session: mockSession },
-      error: null
+      expect(response.success).toBe(false);
+      expect(response.error).toBeTruthy();
     });
 
-    const { result } = renderHook(() => useAuth());
+    it('should reject sign-in with empty email', async () => {
+      const { result } = renderHook(() => useAuth(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
 
-    await act(async () => {
-      const success = await result.current.signIn('test@example.com', 'password123');
-      expect(success).toBe(true);
+      let response: { success: boolean; error?: string } = { success: true };
+      await act(async () => {
+        response = await result.current.signIn('', 'password123');
+      });
+
+      expect(response.success).toBe(false);
     });
 
-    expect(mockSupabase.auth.signInWithPassword).toHaveBeenCalledWith({
-      email: 'test@example.com',
-      password: 'password123'
-    });
-  });
+    it('should sign up a new user', async () => {
+      const { result } = renderHook(() => useAuth(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
 
-  it('should handle sign in error', async () => {
-    const mockError = { message: 'Invalid credentials' };
-    mockSupabase.auth.signInWithPassword.mockResolvedValue({
-      data: { user: null, session: null },
-      error: mockError
-    });
+      let response: { success: boolean; error?: string; needsVerification?: boolean } = { success: false };
+      await act(async () => {
+        response = await result.current.signUp('new@example.com', 'password123', 'Alice');
+      });
 
-    const { result } = renderHook(() => useAuth());
-
-    await act(async () => {
-      const success = await result.current.signIn('test@example.com', 'wrongpassword');
-      expect(success).toBe(false);
-    });
-  });
-
-  it('should handle sign out', async () => {
-    mockSupabase.auth.signOut.mockResolvedValue({ error: null });
-
-    const { result } = renderHook(() => useAuth());
-
-    await act(async () => {
-      await result.current.signOut();
+      expect(response.success).toBe(true);
+      expect(response.needsVerification).toBe(false);
+      expect(result.current.user?.email).toBe('new@example.com');
     });
 
-    expect(mockSupabase.auth.signOut).toHaveBeenCalled();
-  });
+    it('should reject sign-up with password shorter than 6 characters', async () => {
+      const { result } = renderHook(() => useAuth(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
 
-  it('should update user profile', async () => {
-    const updates = { display_name: 'John Doe' };
-    mockSupabase.auth.updateUser.mockResolvedValue({
-      data: { user: { ...mockUser, user_metadata: updates } },
-      error: null
+      let response: { success: boolean; error?: string } = { success: true };
+      await act(async () => {
+        response = await result.current.signUp('new@example.com', 'abc');
+      });
+
+      expect(response.success).toBe(false);
     });
 
-    const { result } = renderHook(() => useAuth());
+    it('should reject duplicate sign-up for the same email', async () => {
+      // Mock getItem to return an existing user registry
+      const existingUsers = {
+        'abc123': {
+          id: 'abc123',
+          email: 'existing@example.com',
+          passwordHash: 'fakehash',
+          name: 'Existing',
+          createdAt: new Date().toISOString(),
+        },
+      };
+      jest.spyOn(Storage.prototype, 'getItem').mockImplementation((key: string) => {
+        if (key === 'cryptotracker_users') return JSON.stringify(existingUsers);
+        return null;
+      });
 
-    await act(async () => {
-      const success = await result.current.updateProfile(updates);
-      expect(success).toBe(true);
+      const { result } = renderHook(() => useAuth(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      let response: { success: boolean; error?: string } = { success: true };
+      await act(async () => {
+        response = await result.current.signUp('existing@example.com', 'password123');
+      });
+
+      expect(response.success).toBe(false);
+      expect(response.error).toMatch(/already exists/i);
+      jest.spyOn(Storage.prototype, 'getItem').mockRestore();
     });
 
-    expect(mockSupabase.auth.updateUser).toHaveBeenCalledWith({
-      data: updates
-    });
-  });
+    it('should sign in successfully after sign-up', async () => {
+      const { result } = renderHook(() => useAuth(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
 
-  it('should handle profile update error', async () => {
-    const mockError = { message: 'Update failed' };
-    const updates = { display_name: 'John Doe' };
-    
-    mockSupabase.auth.updateUser.mockResolvedValue({
-      data: { user: null },
-      error: mockError
-    });
+      // Sign up first
+      await act(async () => {
+        await result.current.signUp('user@example.com', 'mypassword', 'User');
+      });
+      expect(result.current.user?.email).toBe('user@example.com');
 
-    const { result } = renderHook(() => useAuth());
+      // Sign out
+      await act(async () => {
+        await result.current.signOut();
+      });
+      expect(result.current.user).toBeNull();
 
-    await act(async () => {
-      const success = await result.current.updateProfile(updates);
-      expect(success).toBe(false);
-    });
-  });
-
-  it('should reset password', async () => {
-    mockSupabase.auth.resetPasswordForEmail.mockResolvedValue({
-      data: {},
-      error: null
+      // Sign in with the same credentials
+      let response: { success: boolean; error?: string } = { success: false };
+      await act(async () => {
+        response = await result.current.signIn('user@example.com', 'mypassword');
+      });
+      expect(response.success).toBe(true);
+      expect(result.current.user?.email).toBe('user@example.com');
     });
 
-    const { result } = renderHook(() => useAuth());
+    it('should reject sign-in with wrong password', async () => {
+      const { result } = renderHook(() => useAuth(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
 
-    await act(async () => {
-      const success = await result.current.resetPassword('test@example.com');
-      expect(success).toBe(true);
+      await act(async () => {
+        await result.current.signUp('user2@example.com', 'correctpassword');
+      });
+      await act(async () => {
+        await result.current.signOut();
+      });
+
+      let response: { success: boolean; error?: string } = { success: true };
+      await act(async () => {
+        response = await result.current.signIn('user2@example.com', 'wrongpassword');
+      });
+      expect(response.success).toBe(false);
+      expect(response.error).toMatch(/invalid password/i);
     });
 
-    expect(mockSupabase.auth.resetPasswordForEmail).toHaveBeenCalledWith('test@example.com');
-  });
+    it('should sign out and clear user state', async () => {
+      const { result } = renderHook(() => useAuth(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
 
-  it('should handle password reset error', async () => {
-    const mockError = { message: 'Email not found' };
-    mockSupabase.auth.resetPasswordForEmail.mockResolvedValue({
-      data: {},
-      error: mockError
+      await act(async () => {
+        await result.current.signUp('test@example.com', 'password123');
+      });
+      expect(result.current.user).not.toBeNull();
+
+      await act(async () => {
+        await result.current.signOut();
+      });
+      expect(result.current.user).toBeNull();
     });
 
-    const { result } = renderHook(() => useAuth());
+    it('should update user profile', async () => {
+      const { result } = renderHook(() => useAuth(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
 
-    await act(async () => {
-      const success = await result.current.resetPassword('nonexistent@example.com');
-      expect(success).toBe(false);
-    });
-  });
+      await act(async () => {
+        await result.current.signUp('test@example.com', 'password123');
+      });
 
-  it('should initialize session on mount', async () => {
-    const mockSession = { user: mockUser, access_token: 'mock-token' };
-    mockSupabase.auth.getSession.mockResolvedValue({
-      data: { session: mockSession },
-      error: null
-    });
+      let ok = false;
+      await act(async () => {
+        ok = await result.current.updateProfile({ name: 'Alice' });
+      });
 
-    const { result } = renderHook(() => useAuth());
-
-    await waitFor(() => {
-      expect(result.current.loading).toBe(false);
+      expect(ok).toBe(true);
     });
 
-    expect(mockSupabase.auth.getSession).toHaveBeenCalled();
-  });
+    it('should not call Supabase signInWithPassword when in local auth mode', async () => {
+      const { result } = renderHook(() => useAuth(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
 
-  it('should set up auth state change listener', () => {
-    const mockUnsubscribe = jest.fn();
-    mockSupabase.auth.onAuthStateChange.mockReturnValue({
-      data: { subscription: { unsubscribe: mockUnsubscribe } }
+      await act(async () => {
+        await result.current.signUp('test@example.com', 'password123');
+      });
+      await act(async () => {
+        await result.current.signIn('test@example.com', 'password123');
+      });
+
+      expect(mockSupabase.auth.signInWithPassword).not.toHaveBeenCalled();
     });
 
-    const { unmount } = renderHook(() => useAuth());
+    it('should restore a saved session on mount', async () => {
+      const savedUser = { ...mockUser, email: 'saved@example.com' };
+      const spy = jest.spyOn(Storage.prototype, 'getItem').mockImplementation((key: string) => {
+        if (key === 'cryptotracker_user_session') {
+          return JSON.stringify({ user: savedUser, timestamp: Date.now() });
+        }
+        return null;
+      });
 
-    expect(mockSupabase.auth.onAuthStateChange).toHaveBeenCalled();
+      const { result } = renderHook(() => useAuth(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
 
-    unmount();
-    expect(mockUnsubscribe).toHaveBeenCalled();
+      expect(result.current.user?.email).toBe('saved@example.com');
+      spy.mockRestore();
+    });
+
+    it('should discard an expired session on mount', async () => {
+      const savedUser = { ...mockUser };
+      const expiredTimestamp = Date.now() - 31 * 24 * 60 * 60 * 1000; // 31 days ago
+      const spy = jest.spyOn(Storage.prototype, 'getItem').mockImplementation((key: string) => {
+        if (key === 'cryptotracker_user_session') {
+          return JSON.stringify({ user: savedUser, timestamp: expiredTimestamp });
+        }
+        return null;
+      });
+
+      const { result } = renderHook(() => useAuth(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      expect(result.current.user).toBeNull();
+      spy.mockRestore();
+    });
   });
 });

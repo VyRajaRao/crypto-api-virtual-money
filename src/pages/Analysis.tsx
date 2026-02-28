@@ -33,10 +33,6 @@ export default function Analysis() {
   const [insights, setInsights] = useState<Insight[]>([]);
   const [activeChart, setActiveChart] = useState<'pie' | 'bar'>('pie');
 
-  if (!user) {
-    return <Navigate to="/auth" replace />;
-  }
-
   // Calculate portfolio metrics
   const totalValue = portfolio?.reduce((sum, item) => sum + ((item.amount || 0) * (item.current_price || 0)), 0) || 0;
   const totalInvested = portfolio?.reduce((sum, item) => sum + ((item.amount || 0) * (item.avg_buy_price || 0)), 0) || 0;
@@ -115,6 +111,10 @@ export default function Analysis() {
 
     setInsights(newInsights);
   }, [portfolio, totalProfit, totalProfitPercentage, pieChartData]);
+
+  if (!user) {
+    return <Navigate to="/auth" replace />;
+  }
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
