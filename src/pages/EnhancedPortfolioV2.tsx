@@ -84,10 +84,6 @@ export default function EnhancedPortfolioV2() {
     buyPrice: '',
   });
 
-  if (!user) {
-    return <Navigate to="/auth" replace />;
-  }
-
   // Filter and sort portfolio
   const filteredAndSortedPortfolio = useMemo(() => {
     let filtered = portfolio.filter(item => {
@@ -140,8 +136,12 @@ export default function EnhancedPortfolioV2() {
     const [reorderedItem] = items.splice(result.source.index, 1);
     items.splice(result.destination.index, 0, reorderedItem);
 
-    reorderAssets(items);
+      reorderAssets(items);
   }, [portfolio, reorderAssets]);
+
+  if (!user) {
+    return <Navigate to="/auth" replace />;
+  }
 
   // Selection handlers
   const toggleAssetSelection = (assetId: string) => {

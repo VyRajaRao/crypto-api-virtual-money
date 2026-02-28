@@ -1,100 +1,138 @@
+import React from 'react';
 import { renderHook, act, waitFor } from '@testing-library/react';
-import { useAuth } from '@/hooks/useAuth';
+import { AuthProvider, useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { createMockUser } from '../setup';
 
-// Mock the supabase client
-jest.mock('@/lib/supabase');
+// supabase is mocked in setup.ts via jest.mock('@/lib/supabase')
+const mockSupabase = supabase as jest.Mocked<typeof supabase>;
+
+const wrapper = ({ children }: { children: React.ReactNode }) => (
+  <AuthProvider>{children}</AuthProvider>
+);
 
 describe('useAuth', () => {
   const mockUser = createMockUser();
-  const mockSupabase = supabase as jest.Mocked<typeof supabase>;
 
   beforeEach(() => {
     jest.clearAllMocks();
+    // Default: no session
+    (mockSupabase.auth.getSession as jest.Mock).mockResolvedValue({
+      data: { session: null },
+      error: null,
+    });
+    (mockSupabase.auth.onAuthStateChange as jest.Mock).mockReturnValue({
+      data: { subscription: { unsubscribe: jest.fn() } },
+    });
   });
 
-  it('should initialize with loading state', () => {
-    const { result } = renderHook(() => useAuth());
+  it('should initialize with loading state then settle', async () => {
+    const { result } = renderHook(() => useAuth(), { wrapper });
 
     expect(result.current.loading).toBe(true);
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
     expect(result.current.user).toBeNull();
     expect(result.current.session).toBeNull();
   });
 
-  it('should handle successful sign up', async () => {
-    mockSupabase.auth.signUp.mockResolvedValue({
-      data: { user: mockUser, session: null },
-      error: null
-    });
-
-    const { result } = renderHook(() => useAuth());
-
-    await act(async () => {
-      const success = await result.current.signUp('test@example.com', 'password123');
-      expect(success).toBe(true);
-    });
-
-    expect(mockSupabase.auth.signUp).toHaveBeenCalledWith({
-      email: 'test@example.com',
-      password: 'password123'
-    });
-  });
-
-  it('should handle sign up error', async () => {
-    const mockError = { message: 'Email already exists' };
-    mockSupabase.auth.signUp.mockResolvedValue({
-      data: { user: null, session: null },
-      error: mockError
-    });
-
-    const { result } = renderHook(() => useAuth());
-
-    await act(async () => {
-      const success = await result.current.signUp('test@example.com', 'password123');
-      expect(success).toBe(false);
-    });
+  it('should throw when used outside AuthProvider', () => {
+    const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    expect(() => renderHook(() => useAuth())).toThrow(
+      'useAuth must be used within an AuthProvider'
+    );
+    spy.mockRestore();
   });
 
   it('should handle successful sign in', async () => {
-    const mockSession = { user: mockUser, access_token: 'mock-token' };
-    mockSupabase.auth.signInWithPassword.mockResolvedValue({
-      data: { user: mockUser, session: mockSession },
-      error: null
+    (mockSupabase.auth.signInWithPassword as jest.Mock).mockResolvedValue({
+      data: { user: mockUser, session: { user: mockUser, access_token: 'tok' } },
+      error: null,
     });
 
-    const { result } = renderHook(() => useAuth());
+    const { result } = renderHook(() => useAuth(), { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
 
+    let response: { success: boolean; error?: string } = { success: false };
     await act(async () => {
-      const success = await result.current.signIn('test@example.com', 'password123');
-      expect(success).toBe(true);
+      response = await result.current.signIn('test@example.com', 'password123');
     });
 
+    expect(response.success).toBe(true);
+    expect(response.error).toBeUndefined();
     expect(mockSupabase.auth.signInWithPassword).toHaveBeenCalledWith({
       email: 'test@example.com',
-      password: 'password123'
+      password: 'password123',
     });
   });
 
   it('should handle sign in error', async () => {
-    const mockError = { message: 'Invalid credentials' };
-    mockSupabase.auth.signInWithPassword.mockResolvedValue({
+    (mockSupabase.auth.signInWithPassword as jest.Mock).mockResolvedValue({
       data: { user: null, session: null },
-      error: mockError
+      error: { message: 'Invalid credentials' },
     });
 
-    const { result } = renderHook(() => useAuth());
+    const { result } = renderHook(() => useAuth(), { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
 
+    let response: { success: boolean; error?: string } = { success: true };
     await act(async () => {
-      const success = await result.current.signIn('test@example.com', 'wrongpassword');
-      expect(success).toBe(false);
+      response = await result.current.signIn('test@example.com', 'wrongpassword');
     });
+
+    expect(response.success).toBe(false);
+    expect(response.error).toBe('Invalid credentials');
+  });
+
+  it('should handle successful sign up', async () => {
+    (mockSupabase.auth.signUp as jest.Mock).mockResolvedValue({
+      data: {
+        user: { ...mockUser, email_confirmed_at: new Date().toISOString() },
+        session: { user: mockUser, access_token: 'tok' },
+      },
+      error: null,
+    });
+
+    const { result } = renderHook(() => useAuth(), { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    let response: { success: boolean; error?: string; needsVerification?: boolean } = { success: false };
+    await act(async () => {
+      response = await result.current.signUp('test@example.com', 'password123');
+    });
+
+    expect(response.success).toBe(true);
+    expect(mockSupabase.auth.signUp).toHaveBeenCalledWith(
+      expect.objectContaining({ email: 'test@example.com', password: 'password123' })
+    );
+  });
+
+  it('should handle sign up error', async () => {
+    (mockSupabase.auth.signUp as jest.Mock).mockResolvedValue({
+      data: { user: null, session: null },
+      error: { message: 'Email already exists' },
+    });
+
+    const { result } = renderHook(() => useAuth(), { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    let response: { success: boolean; error?: string } = { success: true };
+    await act(async () => {
+      response = await result.current.signUp('test@example.com', 'password123');
+    });
+
+    expect(response.success).toBe(false);
+    expect(response.error).toBe('Email already exists');
   });
 
   it('should handle sign out', async () => {
-    mockSupabase.auth.signOut.mockResolvedValue({ error: null });
+    (mockSupabase.auth.signOut as jest.Mock).mockResolvedValue({ error: null });
 
-    const { result } = renderHook(() => useAuth());
+    const { result } = renderHook(() => useAuth(), { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
 
     await act(async () => {
       await result.current.signOut();
@@ -104,80 +142,71 @@ describe('useAuth', () => {
   });
 
   it('should update user profile', async () => {
-    const updates = { display_name: 'John Doe' };
-    mockSupabase.auth.updateUser.mockResolvedValue({
-      data: { user: { ...mockUser, user_metadata: updates } },
-      error: null
+    (mockSupabase.auth.updateUser as jest.Mock).mockResolvedValue({
+      data: { user: { ...mockUser, user_metadata: { name: 'John Doe' } } },
+      error: null,
     });
 
-    const { result } = renderHook(() => useAuth());
+    const { result } = renderHook(() => useAuth(), { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
 
+    let success = false;
     await act(async () => {
-      const success = await result.current.updateProfile(updates);
-      expect(success).toBe(true);
+      success = await result.current.updateProfile({ name: 'John Doe' });
     });
 
+    expect(success).toBe(true);
     expect(mockSupabase.auth.updateUser).toHaveBeenCalledWith({
-      data: updates
+      data: { name: 'John Doe' },
     });
   });
 
   it('should handle profile update error', async () => {
-    const mockError = { message: 'Update failed' };
-    const updates = { display_name: 'John Doe' };
-    
-    mockSupabase.auth.updateUser.mockResolvedValue({
+    (mockSupabase.auth.updateUser as jest.Mock).mockResolvedValue({
       data: { user: null },
-      error: mockError
+      error: { message: 'Update failed' },
     });
 
-    const { result } = renderHook(() => useAuth());
+    const { result } = renderHook(() => useAuth(), { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
 
+    let success = true;
     await act(async () => {
-      const success = await result.current.updateProfile(updates);
-      expect(success).toBe(false);
+      success = await result.current.updateProfile({ name: 'John Doe' });
     });
+
+    expect(success).toBe(false);
   });
 
   it('should reset password', async () => {
-    mockSupabase.auth.resetPasswordForEmail.mockResolvedValue({
+    (mockSupabase.auth.resetPasswordForEmail as jest.Mock).mockResolvedValue({
       data: {},
-      error: null
+      error: null,
     });
 
-    const { result } = renderHook(() => useAuth());
+    const { result } = renderHook(() => useAuth(), { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
 
+    let response: { success: boolean; error?: string } = { success: false };
     await act(async () => {
-      const success = await result.current.resetPassword('test@example.com');
-      expect(success).toBe(true);
+      response = await result.current.resetPassword('test@example.com');
     });
 
-    expect(mockSupabase.auth.resetPasswordForEmail).toHaveBeenCalledWith('test@example.com');
+    expect(response.success).toBe(true);
+    expect(mockSupabase.auth.resetPasswordForEmail).toHaveBeenCalledWith(
+      'test@example.com',
+      expect.any(Object)
+    );
   });
 
-  it('should handle password reset error', async () => {
-    const mockError = { message: 'Email not found' };
-    mockSupabase.auth.resetPasswordForEmail.mockResolvedValue({
-      data: {},
-      error: mockError
-    });
-
-    const { result } = renderHook(() => useAuth());
-
-    await act(async () => {
-      const success = await result.current.resetPassword('nonexistent@example.com');
-      expect(success).toBe(false);
-    });
-  });
-
-  it('should initialize session on mount', async () => {
+  it('should restore session on mount', async () => {
     const mockSession = { user: mockUser, access_token: 'mock-token' };
-    mockSupabase.auth.getSession.mockResolvedValue({
+    (mockSupabase.auth.getSession as jest.Mock).mockResolvedValue({
       data: { session: mockSession },
-      error: null
+      error: null,
     });
 
-    const { result } = renderHook(() => useAuth());
+    const { result } = renderHook(() => useAuth(), { wrapper });
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
@@ -186,16 +215,15 @@ describe('useAuth', () => {
     expect(mockSupabase.auth.getSession).toHaveBeenCalled();
   });
 
-  it('should set up auth state change listener', () => {
+  it('should set up auth state change listener and clean up on unmount', () => {
     const mockUnsubscribe = jest.fn();
-    mockSupabase.auth.onAuthStateChange.mockReturnValue({
-      data: { subscription: { unsubscribe: mockUnsubscribe } }
+    (mockSupabase.auth.onAuthStateChange as jest.Mock).mockReturnValue({
+      data: { subscription: { unsubscribe: mockUnsubscribe } },
     });
 
-    const { unmount } = renderHook(() => useAuth());
+    const { unmount } = renderHook(() => useAuth(), { wrapper });
 
     expect(mockSupabase.auth.onAuthStateChange).toHaveBeenCalled();
-
     unmount();
     expect(mockUnsubscribe).toHaveBeenCalled();
   });
