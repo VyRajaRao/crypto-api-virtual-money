@@ -78,7 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email,
         password,
         options: {
-          data: { name: name || email.split('@')[0] },
+          data: { name: name || 'User' },
         },
       });
 
@@ -117,9 +117,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const resendVerificationEmail = async (_email: string): Promise<{ success: boolean; error?: string }> => {
-    // Supabase doesn't have a direct resend verification API via client SDK
-    // Return success to indicate the user should check their email
-    return { success: true };
+    // Supabase client SDK does not expose a direct resend-verification-email endpoint.
+    // Users should check their inbox or use the Supabase Auth dashboard to resend.
+    return { success: false, error: 'Please use the sign-up form again or contact support to resend your verification email.' };
   };
 
   const resetPassword = async (email: string): Promise<{ success: boolean; error?: string }> => {

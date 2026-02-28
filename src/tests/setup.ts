@@ -83,7 +83,7 @@ jest.mock('@/lib/supabase', () => ({
       limit: jest.fn().mockReturnThis(),
       single: jest.fn(() => Promise.resolve({ data: null, error: null })),
       then: jest.fn((callback: (r: { data: unknown[]; error: null }) => void) =>
-        callback({ data: [], error: null })
+        Promise.resolve({ data: [], error: null }).then(callback)
       ),
     })),
     storage: {
