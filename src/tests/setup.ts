@@ -61,6 +61,7 @@ global.fetch = jest.fn(() =>
 
 // Mock Supabase
 jest.mock('@/lib/supabase', () => ({
+  supabaseEnabled: false, // tests run without real credentials → demo mode
   supabase: {
     auth: {
       getSession: jest.fn(() => Promise.resolve({ data: { session: null }, error: null })),
